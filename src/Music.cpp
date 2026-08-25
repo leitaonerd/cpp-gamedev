@@ -13,6 +13,14 @@ Music::Music(std::string file){
     Open(file);
 }
 
+Music::~Music(){
+    if(IsOpen()){
+        Stop(0);
+        if(track) MIX_DestroyTrack(track); 
+        if(audio) MIX_DestroyAudio(audio); 
+    }
+}
+
 void Music::Play(int times){
     if(IsOpen()){
         SDL_PropertiesID props = SDL_CreateProperties();
@@ -23,6 +31,12 @@ void Music::Play(int times){
         SDL_DestroyProperties(props);
     } else{
         std::cerr << "Nenhuma musica carregada. Audio nao pode ser reproduzido" << std::endl;
+    }
+}
+
+void Music::Stop(int msToStop){
+    if(track){
+        MIX_StopTrack(track, msToStop);
     }
 }
 

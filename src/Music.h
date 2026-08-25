@@ -1,4 +1,5 @@
-#include <string.h>
+#pragma once
+#include <string>
 #include <SDL3_mixer/SDL_mixer.h>
 
 class Music{
