@@ -1,0 +1,1 @@
+g++ src/main.cpp -I./include -L./lib -lSDL3_image -lSDL3_mixer -lSDL3_ttf -lSDL3 -o mygame.exe
