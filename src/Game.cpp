@@ -24,8 +24,11 @@ Game::Game(std::string title, int width, int height){
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
     }
     //retirei check de load das imagens pq aparentemente removeram as funções
+    if (MIX_Init() == 0) { 
+    std::cerr << "MIX_Init Error: " << SDL_GetError() << std::endl;
+}
     //SDL3_mixer device
-    mixer = MIX_CreateMixerDevice(0, nullptr);
+    mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
     if(mixer == nullptr){
         std::cerr << "Mixer Error: " << SDL_GetError() << std::endl;
     }
@@ -46,6 +49,7 @@ Game::Game(std::string title, int width, int height){
 Game::~Game(){
     delete state;
     if(mixer) MIX_DestroyMixer(mixer);
+    MIX_Quit();
     //IMG_Quit();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
