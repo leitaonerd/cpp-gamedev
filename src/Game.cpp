@@ -6,7 +6,7 @@ Game* Game::instance = nullptr;
 
 Game& Game::GetInstance(){
     if(instance == nullptr){
-        instance = new Game("Nome - [Matrícula]", 1200, 900);
+        instance = new Game("Rafael Medeiros de Alencar - 241020760", 1200, 900);
     }
     return *instance;
 }
