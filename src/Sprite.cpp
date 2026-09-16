@@ -7,7 +7,7 @@ Sprite::Sprite(){
     texture = nullptr;
 }
 
-Sprite::Sprite(std::string file) {
+Sprite::Sprite(std::string file){
     texture = nullptr;
     Open(file);
 }
@@ -18,7 +18,7 @@ Sprite::~Sprite() {
     }
 }
 
-void Sprite::Open(std::string file) {
+void Sprite::Open(std::string file){
     if (IsOpen()) {
         SDL_DestroyTexture(texture);
     }
@@ -35,14 +35,14 @@ void Sprite::Open(std::string file) {
     SetClip(0, 0, width, height);
 }
 
-void Sprite::SetClip(float x, float y, float w, float h) {
+void Sprite::SetClip(float x, float y, float w, float h){
     clipRect.x = x;
     clipRect.y = y;
     clipRect.w = w;
     clipRect.h = h;
 }
 
-void Sprite::Render(float x, float y) {
+void Sprite::Render(float x, float y){
     SDL_Renderer* renderer = Game::GetInstance().GetRenderer();
     
     SDL_FRect dstRect;
@@ -54,14 +54,14 @@ void Sprite::Render(float x, float y) {
     SDL_RenderTexture(renderer, texture, &clipRect, &dstRect);
 }
 
-float Sprite::GetWidth() {
+float Sprite::GetWidth(){
     return width;
 }
 
-float Sprite::GetHeight() {
+float Sprite::GetHeight(){
     return height;
 }
 
-bool Sprite::IsOpen() {
+bool Sprite::IsOpen(){
     return texture != nullptr;
 }
