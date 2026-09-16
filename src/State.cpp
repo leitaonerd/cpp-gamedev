@@ -1,30 +1,58 @@
 #include "State.h"
 #include <SDL3/SDL.h>
 
-State::State() : bg("assets/img/Background.png"), music("assets/audio/BGM.wav"){
-    quitRequested = false;
+State::State() : quitRequested(false) {
+    //removeu o bg
+    music.Open("audio/BGM.wav");
+    music.Play();
+}
 
-    music.Play(-1);
+State::~State() {
+    objectArray.clear(); //unique_pointer cuida do resto
 }
 
 void State::LoadAssets(){
     //tirar depois do construtor e colocar aqui
 }
 
+void State::AddObject(GameObject* go) {
+    //constroi o unique_ptr in place
+    objectArray.emplace_back(go);
+}
+
 void State::Update(float dt){
     SDL_Event event;
-
-    while(SDL_PollEvent(&event)){
+    while (SDL_PollEvent(&event)) {
         if(event.type == SDL_EVENT_QUIT){
             quitRequested = true;
+        }
+    }
+
+    //1) percorre o vetor chamando o Update dos mesmos
+    for (int i = 0; i < objectArray.size(); i++){
+        objectArray[i]->Update(dt);
+    }
+
+    //2) percorre o array testando se algum GameObject morreu
+    for (int i = 0; i < objectArray.size(); i++){
+        if (objectArray[i]->IsDead()) {
+            
+            objectArray.erase(objectArray.begin() + i); //remove do array usando begin() + i
+            i--; //ajuste de indice por causa do shift de retirar
         }
     }
 }
 
 void State::Render(){
-    bg.Render(0.0f, 0.0f);
+    for(int i = 0; i < objectArray.size(); i++){
+        objectArray[i]->Render();
+    }
 }
 
 bool State::QuitRequested(){
     return quitRequested;
+}
+
+void State::LoadAssets() {
+    //criar vazio
 }
