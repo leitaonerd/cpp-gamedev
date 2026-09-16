@@ -9,17 +9,23 @@ class Sprite{
         float height;
         SDL_FRect clipRect;
 
+        int frameCountW;
+        int frameCountH;
+
     public:
         Sprite();
-        Sprite(std::string file);
+        Sprite(std::string file, int frameCountW = 1, int frameCountH = 1);
         ~Sprite();
 
         void Open(std::string file);
         void SetClip(float x, float y, float w, float h);
-        void Render(float x, float y);
+        void Render(float x, float y, float w, float h);
 
         float GetWidth();
         float GetHeight();
         bool IsOpen();
+
+        void SetFrame(int frame);
+        void SetFrameCount(int frameCountW, int frameCountH);
 
 };

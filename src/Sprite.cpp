@@ -3,63 +3,76 @@
 #include <SDL3_image/SDL_image.h>
 #include <iostream>
 
-Sprite::Sprite(){
-    texture = nullptr;
-}
+Sprite::Sprite() : texture(nullptr), width(0), height(0), frameCountW(1), frameCountH(1) {}
 
-Sprite::Sprite(std::string file){
-    texture = nullptr;
+Sprite::Sprite(std::string file, int frameCountW, int frameCountH) : texture(nullptr){
+    this->frameCountW = frameCountW;
+    this->frameCountH = frameCountH;
     Open(file);
 }
 
-Sprite::~Sprite() {
-    if (IsOpen()) {
+Sprite::~Sprite(){
+    if(texture){
         SDL_DestroyTexture(texture);
     }
 }
 
 void Sprite::Open(std::string file){
-    if (IsOpen()) {
+    if (texture){
         SDL_DestroyTexture(texture);
     }
-    
-    SDL_Renderer* renderer = Game::GetInstance().GetRenderer();
-    texture = IMG_LoadTexture(renderer, file.c_str());
-    
-    if (texture == nullptr) {
-        std::cerr << "Erro IMG_LoadTexture: " << SDL_GetError() << std::endl;
+
+    texture = IMG_LoadTexture(Game::GetInstance().GetRenderer(), file.c_str());
+    if (texture == nullptr){
+        std::cerr << "IMG_LoadTexture Error: " << SDL_GetError() << std::endl;
         return;
     }
-    
-    SDL_GetTextureSize(texture, &width, &height);
-    SetClip(0, 0, width, height);
+
+    //SDL_QueryTexture foi substituído por obter as propriedades via float
+    float fWidth, fHeight;
+    SDL_GetTextureSize(texture, &fWidth, &fHeight);
+    width = static_cast<int>(fWidth);
+    height = static_cast<int>(fHeight);
+
+    SetFrame(0); //0 eh padrao
 }
 
-void Sprite::SetClip(float x, float y, float w, float h){
-    clipRect.x = x;
-    clipRect.y = y;
-    clipRect.w = w;
-    clipRect.h = h;
+void Sprite::SetClip(int x, int y, int w, int h){
+    clipRect.x = static_cast<float>(x);
+    clipRect.y = static_cast<float>(y);
+    clipRect.w = static_cast<float>(w);
+    clipRect.h = static_cast<float>(h);
 }
 
-void Sprite::Render(float x, float y){
-    SDL_Renderer* renderer = Game::GetInstance().GetRenderer();
+void Sprite::Render(float x, float y, float w, float h){
+    if (texture){
+        SDL_FRect dstRect = { x, y, w, h };
+        //passa o clipRect como a origem e dstRect como o destino
+        SDL_RenderTexture(Game::GetInstance().GetRenderer(), texture, &clipRect, &dstRect);
+    }
+}
+
+void Sprite::SetFrameCount(int frameCountW, int frameCountH){
+    this->frameCountW = frameCountW;
+    this->frameCountH = frameCountH;
+}
+
+void Sprite::SetFrame(int frame) {
+    int frameW = GetWidth();
+    int frameH = GetHeight();
     
-    SDL_FRect dstRect;
-    dstRect.x = x;
-    dstRect.y = y;
-    dstRect.w = clipRect.w;
-    dstRect.h = clipRect.h;
+    int currentX = (frame % frameCountW) * frameW;
+    int currentY = (frame / frameCountW) * frameH;
     
-    SDL_RenderTexture(renderer, texture, &clipRect, &dstRect);
+    SetClip(currentX, currentY, frameW, frameH);
 }
 
 float Sprite::GetWidth(){
-    return width;
+    return width / frameCountW;
 }
 
 float Sprite::GetHeight(){
-    return height;
+    return height / frameCountH;
 }
 
 bool Sprite::IsOpen(){
