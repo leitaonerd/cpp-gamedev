@@ -1,1 +1,1 @@
-g++ src/main.cpp src/Game.cpp src/State.cpp src/Sprite.cpp src/Music.cpp -I./include -L./lib -lSDL3_image -lSDL3_mixer -lSDL3_ttf -lSDL3 -o mygame.exe
+g++ src/main.cpp src/Game.cpp src/State.cpp src/Sprite.cpp src/Music.cpp src/Vec2.cpp src/Rect.cpp src/GameObject.cpp -I./include -L./lib -lSDL3_image -lSDL3_mixer -lSDL3_ttf -lSDL3 -o mygame.exe

@@ -20,11 +20,11 @@ Game::Game(std::string title, int width, int height){
     instance = this;    
 
     //core SDL3 subsystems
-    if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0){
+    if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)){
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
     }
     //retirei check de load das imagens pq aparentemente removeram as funções
-    if (MIX_Init() == 0) { 
+    if (!MIX_Init()) { 
     std::cerr << "MIX_Init Error: " << SDL_GetError() << std::endl;
 }
     //SDL3_mixer device
