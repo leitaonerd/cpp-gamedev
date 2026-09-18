@@ -3,6 +3,7 @@
 #include <memory>
 #include "Sprite.h"
 #include "Music.h"
+#include "GameObject.h"
 
 class State {
     private:

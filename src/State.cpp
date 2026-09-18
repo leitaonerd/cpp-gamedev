@@ -1,4 +1,6 @@
 #include "State.h"
+#include "SpriteRenderer.h"
+#include "Zombie.h"
 #include <SDL3/SDL.h>
 
 State::State() : quitRequested(false) {
@@ -68,8 +70,4 @@ void State::Render(){
 
 bool State::QuitRequested(){
     return quitRequested;
-}
-
-void State::LoadAssets() {
-    //criar vazio
 }
