@@ -6,7 +6,7 @@
 State::State() : quitRequested(false) {
     //novo background
     GameObject* bgObj = new GameObject();
-    SpriteRenderer* bgRenderer = new SpriteRenderer(*bgObj, "assets/img/ocean.jpg");
+    SpriteRenderer* bgRenderer = new SpriteRenderer(*bgObj, "assets/img/Background.png");
     bgObj->AddComponent(bgRenderer);
     AddObject(bgObj);
 
