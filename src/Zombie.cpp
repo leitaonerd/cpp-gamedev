@@ -5,7 +5,7 @@
 #include "Animation.h"
 
 Zombie::Zombie(GameObject& associated) : Component(associated), hitpoints(100) {
-    SpriteRenderer* sprite = new SpriteRenderer(associated, "img/Enemy.png", 3, 2);
+    SpriteRenderer* sprite = new SpriteRenderer(associated, "assets/img/Enemy.png", 3, 2);
     associated.AddComponent(sprite);
 
     Animator* animator = new Animator(associated);

@@ -6,12 +6,12 @@
 State::State() : quitRequested(false) {
     //novo background
     GameObject* bgObj = new GameObject();
-    SpriteRenderer* bgRenderer = new SpriteRenderer(*bgObj, "img/ocean.jpg");
+    SpriteRenderer* bgRenderer = new SpriteRenderer(*bgObj, "assets/img/ocean.jpg");
     bgObj->AddComponent(bgRenderer);
     AddObject(bgObj);
 
     //musica
-    music.Open("audio/BGM.wav");
+    music.Open("assets/audio/BGM.wav");
     music.Play();
 
     //zumbi

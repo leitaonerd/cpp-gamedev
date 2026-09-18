@@ -18,7 +18,7 @@ class Sprite{
         ~Sprite();
 
         void Open(std::string file);
-        void SetClip(float x, float y, float w, float h);
+        void SetClip(int x, int y, int w, int h);
         void Render(float x, float y, float w, float h);
 
         float GetWidth();
