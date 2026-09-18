@@ -2,7 +2,12 @@
 #include <SDL3/SDL.h>
 
 State::State() : quitRequested(false) {
-    //removeu o bg
+    //novo background
+    GameObject* bgObj = new GameObject();
+    SpriteRenderer* bgRenderer = new SpriteRenderer(*bgObj, "img/ocean.jpg");
+    bgObj->AddComponent(bgRenderer);
+    AddObject(bgObj);
+
     music.Open("audio/BGM.wav");
     music.Play();
 }
