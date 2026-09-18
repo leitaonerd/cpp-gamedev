@@ -8,8 +8,20 @@ State::State() : quitRequested(false) {
     bgObj->AddComponent(bgRenderer);
     AddObject(bgObj);
 
+    //musica
     music.Open("audio/BGM.wav");
     music.Play();
+
+    //zumbi
+    GameObject* zombieObj = new GameObject();
+    //posicao qualquer
+    zombieObj->box.x = 600.0f;
+    zombieObj->box.y = 450.0f;
+
+    Zombie* zombieLogic = new Zombie(*zombieObj);
+    zombieObj->AddComponent(zombieLogic);
+    //coloca no gerenciador de State
+    AddObject(zombieObj);
 }
 
 State::~State() {
