@@ -1,6 +1,8 @@
 #include "State.h"
 #include "SpriteRenderer.h"
 #include "Zombie.h"
+#include "TileMap.h"
+#include "TileSet.h"
 #include <SDL3/SDL.h>
 
 State::State() : quitRequested(false) {
@@ -9,6 +11,16 @@ State::State() : quitRequested(false) {
     SpriteRenderer* bgRenderer = new SpriteRenderer(*bgObj, "assets/img/Background.png");
     bgObj->AddComponent(bgRenderer);
     AddObject(bgObj);
+
+    //mapa
+    GameObject* mapObj = new GameObject();
+    mapObj->box.x = 0;
+    mapObj->box.y = 0;
+    
+    TileSet* tileSet = new TileSet(64, 64, "assets/img/Tileset.png");
+    TileMap* tileMap = new TileMap(*mapObj, "assets/map/map.txt", tileSet);
+    mapObj->AddComponent(tileMap);
+    AddObject(mapObj);
 
     //musica
     music.Open("assets/audio/BGM.wav");

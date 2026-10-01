@@ -17,4 +17,4 @@ class TileSet {
         void RenderTile(unsigned index, float x, float y);
         int GetTileWidth();
         int GetTileHeight();
-}
+};

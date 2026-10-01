@@ -14,16 +14,25 @@ Zombie::Zombie(GameObject& associated) : Component(associated), hitpoints(100) {
     
     associated.AddComponent(animator);
     animator->SetAnimation("walking");
+
+    deathSound.Open("assets/audio/Dead.wav");
 }
 
 void Zombie::Damage(int damage) {
     hitpoints -= damage;
+
+    if(isDead){
+        return;
+    }
     
     if (hitpoints <= 0) {
+        isDead = true;
         Animator* animator = associated.GetComponent<Animator>();
         if (animator != nullptr) {
             animator->SetAnimation("dead");
         }
+
+        deathSound.Play(1);
     }
 }
 
