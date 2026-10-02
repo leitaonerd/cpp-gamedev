@@ -1,6 +1,8 @@
 #include "Music.h"
 #include "Game.h"
+#include "Resources.h"
 #include <iostream>
+
 
 Music::Music(){
     audio = nullptr;
@@ -17,7 +19,6 @@ Music::~Music(){
     if(IsOpen()){
         Stop(0);
         if(track) MIX_DestroyTrack(track); 
-        if(audio) MIX_DestroyAudio(audio); 
     }
 }
 
@@ -43,8 +44,7 @@ void Music::Stop(int msToStop){
 void Music::Open(std::string file){
     MIX_Mixer* mixer = Game::GetInstance().GetMixer();
 
-    //true pré-decodifica o arquivo de audio na memória pra ter um playback
-    audio = MIX_LoadAudio(mixer, file.c_str(), true);
+    audio = Resources::GetAudio(file);
 
     if(audio == nullptr){
         std::cerr << "MIX_LoadAudio Error: " << SDL_GetError() << std::endl;

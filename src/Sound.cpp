@@ -1,5 +1,6 @@
 #include "Sound.h"
 #include "Game.h"
+#include "Resources.h"
 #include <iostream>
 
 Sound::Sound() {
@@ -16,8 +17,7 @@ Sound::Sound(std::string file) {
 Sound::~Sound() {
     if(IsOpen()) {
         Stop();
-        if(track) MIX_DestroyTrack(track); 
-        if(audio) MIX_DestroyAudio(audio); 
+        if(track) MIX_DestroyTrack(track);
     }
 }
 
@@ -46,8 +46,7 @@ void Sound::Stop() {
 void Sound::Open(std::string file) {
     MIX_Mixer* mixer = Game::GetInstance().GetMixer();
 
-    // true pré-decodifica o arquivo de audio na memória (ideal para efeitos sonoros rápidos)
-    audio = MIX_LoadAudio(mixer, file.c_str(), true);
+    audio = Resources::GetAudio(file);
 
     if(audio == nullptr) {
         std::cerr << "MIX_LoadAudio Error: " << SDL_GetError() << std::endl;

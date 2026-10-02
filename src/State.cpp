@@ -27,15 +27,21 @@ State::State() : quitRequested(false) {
     music.Play();
 
     //zumbi
-    GameObject* zombieObj = new GameObject();
-    //posicao qualquer
-    zombieObj->box.x = 600.0f;
-    zombieObj->box.y = 450.0f;
+    for(int i = 0; i < 3; i++){
+        GameObject* zombieObj = new GameObject();
 
-    Zombie* zombieLogic = new Zombie(*zombieObj);
-    zombieObj->AddComponent(zombieLogic);
-    //coloca no gerenciador de State
-    AddObject(zombieObj);
+
+        //posicao qualquer
+        float min = 40;
+        float max = 600;
+        zombieObj->box.x = min + (rand() % (int)(max - min + 1));
+        zombieObj->box.y = min + (rand() % (int)(max - min + 1));
+
+        Zombie* zombieLogic = new Zombie(*zombieObj);
+        zombieObj->AddComponent(zombieLogic);
+        //coloca no gerenciador de State
+        AddObject(zombieObj);
+    }
 }
 
 State::~State() {

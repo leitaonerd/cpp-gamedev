@@ -1,5 +1,6 @@
 #include "Sprite.h"
 #include "Game.h"
+#include "Resources.h"
 #include <SDL3_image/SDL_image.h>
 #include <iostream>
 
@@ -13,16 +14,12 @@ Sprite::Sprite(std::string file, int frameCountW, int frameCountH) : texture(nul
 
 Sprite::~Sprite(){
     if(texture){
-        SDL_DestroyTexture(texture);
+        //SDL_DestroyTexture(texture);
     }
 }
 
 void Sprite::Open(std::string file){
-    if (texture){
-        SDL_DestroyTexture(texture);
-    }
-
-    texture = IMG_LoadTexture(Game::GetInstance().GetRenderer(), file.c_str());
+    texture = Resources::GetImage(file);
     if (texture == nullptr){
         std::cerr << "IMG_LoadTexture Error: " << SDL_GetError() << std::endl;
         return;

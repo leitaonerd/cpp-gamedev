@@ -27,13 +27,6 @@ SDL_Texture* Resources::GetImage(std::string file) {
     return it->second;
 }
 
-void Resources::ClearImages() {
-    for (auto& it : imageTable) {
-        SDL_DestroyTexture(it.second);
-    }
-    imageTable.clear();
-}
-
 MIX_Audio* Resources::GetAudio(std::string file) {
     auto it = audioTable.find(file);
 
@@ -53,9 +46,20 @@ MIX_Audio* Resources::GetAudio(std::string file) {
     return it->second;
 }
 
+void Resources::ClearImages() {
+    for (auto it = imageTable.begin(); it != imageTable.end(); it++) {
+        if (it->second != nullptr) {
+            SDL_DestroyTexture(it->second);
+        }
+    }
+    imageTable.clear();
+}
+
 void Resources::ClearAudios() {
-    for (auto& it : audioTable) {
-        MIX_DestroyAudio(it.second);
+    for (auto it = audioTable.begin(); it != audioTable.end(); it++) {
+        if (it->second != nullptr) {
+            MIX_DestroyAudio(it->second);
+        }
     }
     audioTable.clear();
 }
