@@ -15,6 +15,10 @@ class Game {
 
         MIX_Mixer* mixer;
 
+        float dt;
+        Uint64 frameStart; // Em SDL3, SDL_GetTicks retorna Uint64
+        void CalculateDeltaTime();
+
         //Construtor
         Game(std::string title, int width, int height);
 
@@ -27,6 +31,8 @@ class Game {
         SDL_Renderer* GetRenderer();
         State& GetState();
         MIX_Mixer* GetMixer();
+
+        float GetDeltaTime();
 
         static Game& GetInstance();
 };

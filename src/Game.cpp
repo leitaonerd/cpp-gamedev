@@ -68,7 +68,18 @@ MIX_Mixer* Game::GetMixer(){
     return mixer;
 }
 
+void Game::CalculateDeltaTime() {
+    Uint64 currentTime = SDL_GetTicks();
+    dt = (currentTime - frameStart) / 1000.0f;
+    frameStart = currentTime;
+}
+
+float Game::GetDeltaTime() {
+    return dt;
+}
+
 void Game::Run(){
+    frameStart = SDL_GetTicks();
     while (!state->QuitRequested()) {
         state->Update(0.0f);
         state->Render();
