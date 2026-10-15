@@ -12,7 +12,7 @@ void Animator::Update(float dt) {
         return; 
     }
 
-    timeElapsed += 1.0f; //mudar depois pelo delta time de vdd
+    timeElapsed += dt; //mudar depois pelo delta time de vdd
 
     //passou mais tempo que o tempo do frame
     if (timeElapsed > frameTime) {
