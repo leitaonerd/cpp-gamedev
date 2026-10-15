@@ -81,7 +81,10 @@ float Game::GetDeltaTime() {
 void Game::Run(){
     frameStart = SDL_GetTicks();
     while (!state->QuitRequested()) {
-        state->Update(0.0f);
+
+        CalculateDeltaTime();
+        state->Update(GetDeltaTime());
+
         state->Render();
         SDL_RenderPresent(renderer);
         SDL_Delay(33); //30 fps
