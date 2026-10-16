@@ -3,9 +3,11 @@
 #include "Zombie.h"
 #include "TileMap.h"
 #include "TileSet.h"
+#include "InputManager.h"
+#include "Camera.h"
 #include <SDL3/SDL.h>
 
-State::State() : quitRequested(false) {
+State::State() : quitRequested(false){
     //novo background
     GameObject* bgObj = new GameObject();
     SpriteRenderer* bgRenderer = new SpriteRenderer(*bgObj, "assets/img/Background.png");
@@ -44,7 +46,7 @@ State::State() : quitRequested(false) {
     }
 }
 
-State::~State() {
+State::~State(){
     objectArray.clear(); //unique_pointer cuida do resto
 }
 
@@ -52,30 +54,39 @@ void State::LoadAssets(){
     //tirar depois do construtor e colocar aqui
 }
 
-void State::AddObject(GameObject* go) {
+void State::AddObject(GameObject* go){
     //constroi o unique_ptr in place
     objectArray.emplace_back(go);
 }
 
 void State::Update(float dt){
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-        if(event.type == SDL_EVENT_QUIT){
-            quitRequested = true;
-        }
+    InputManager& input = InputManager::GetInstance();
+    
+    if(input.QuitRequested() || input.KeyPress(ESCAPE_KEY)){
+        quitRequested = true;
     }
 
-    //1) percorre o vetor chamando o Update dos mesmos
-    for (int i = 0; i < objectArray.size(); i++){
+    if(input.KeyPress(SPACE_KEY)){
+        GameObject* zombieObj = new GameObject();
+        
+        zombieObj->box.x = input.GetMouseX() + Camera::pos.x;
+        zombieObj->box.y = input.GetMouseY() + Camera::pos.y;
+
+        Zombie* zombieLogic = new Zombie(*zombieObj);
+        zombieObj->AddComponent(zombieLogic);
+        AddObject(zombieObj);
+    }
+
+    Camera::Update(dt);
+
+    for(int i = 0; i < objectArray.size(); i++){
         objectArray[i]->Update(dt);
     }
 
-    //2) percorre o array testando se algum GameObject morreu
-    for (int i = 0; i < objectArray.size(); i++){
-        if (objectArray[i]->IsDead()) {
-            
-            objectArray.erase(objectArray.begin() + i); //remove do array usando begin() + i
-            i--; //ajuste de indice por causa do shift de retirar
+    for(int i = 0; i < objectArray.size(); i++){
+        if(objectArray[i]->IsDead()){
+            objectArray.erase(objectArray.begin() + i);
+            i--; 
         }
     }
 }
