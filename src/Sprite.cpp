@@ -1,6 +1,7 @@
 #include "Sprite.h"
 #include "Game.h"
 #include "Resources.h"
+#include "Camera.h"
 #include <SDL3_image/SDL_image.h>
 #include <iostream>
 
@@ -41,10 +42,17 @@ void Sprite::SetClip(int x, int y, int w, int h){
     clipRect.h = static_cast<float>(h);
 }
 
+void Sprite::SetCameraFollower(bool follow) {
+    cameraFollower = follow;
+}
+
 void Sprite::Render(float x, float y, float w, float h){
     if (texture){
-        SDL_FRect dstRect = { x, y, w, h };
-        //passa o clipRect como a origem e dstRect como o destino
+        //subtrai a camera para nao seguir
+        float renderX = x - (cameraFollower ? 0 : Camera::pos.x);
+        float renderY = y - (cameraFollower ? 0 : Camera::pos.y);
+
+        SDL_FRect dstRect = { renderX, renderY, w, h };
         SDL_RenderTexture(Game::GetInstance().GetRenderer(), texture, &clipRect, &dstRect);
     }
 }

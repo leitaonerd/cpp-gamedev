@@ -18,4 +18,5 @@ public:
     //overide dos métodos abstratos
     void Update(float dt) override;
     void Render() override;
+    void SetCameraFollower(bool follow);
 };

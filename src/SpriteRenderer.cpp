@@ -33,6 +33,10 @@ void SpriteRenderer::SetFrame(int frame) {
 void SpriteRenderer::Update(float dt) {
 }
 
+void SpriteRenderer::SetCameraFollower(bool follow) {
+    sprite.SetCameraFollower(follow);
+}
+
 void SpriteRenderer::Render() {
     //repassa cordenada e dimensoes pro render do sprite
     sprite.Render(associated.box.x - Camera::pos.x, associated.box.y - Camera::pos.y, associated.box.w, associated.box.h);
