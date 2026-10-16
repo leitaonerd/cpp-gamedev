@@ -54,8 +54,8 @@ void State::Update(float dt){
     if(input.KeyPress(SPACE_KEY)){
         GameObject* zombieObj = new GameObject();
         
-        zombieObj->box.x = input.GetMouseX() + Camera::pos.x;
-        zombieObj->box.y = input.GetMouseY() + Camera::pos.y;
+        zombieObj->box.x = input.GetMouseX() + Camera::pos.x - (zombieObj->box.w / 2.0f);
+        zombieObj->box.y = input.GetMouseY() + Camera::pos.y - (zombieObj->box.h / 2.0f);
 
         Zombie* zombieLogic = new Zombie(*zombieObj);
         zombieObj->AddComponent(zombieLogic);

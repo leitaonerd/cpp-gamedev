@@ -5,11 +5,12 @@
 #include <SDL3_image/SDL_image.h>
 #include <iostream>
 
-Sprite::Sprite() : texture(nullptr), width(0), height(0), frameCountW(1), frameCountH(1) {}
+Sprite::Sprite() : texture(nullptr), width(0), height(0), frameCountW(1), frameCountH(1), cameraFollower(false){}
 
 Sprite::Sprite(std::string file, int frameCountW, int frameCountH) : texture(nullptr){
     this->frameCountW = frameCountW;
     this->frameCountH = frameCountH;
+    this->cameraFollower = false;
     Open(file);
 }
 
