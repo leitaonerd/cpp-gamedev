@@ -1,5 +1,6 @@
 #include "TileMap.h"
 #include "GameObject.h"
+#include "Camera.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -54,8 +55,8 @@ void TileMap::RenderLayer(int layer) {
             float posX = x * tileSet->GetTileWidth();
             float posY = y * tileSet->GetTileHeight();
             
-            posX += associated.box.x;
-            posY += associated.box.y;
+            posX = posX + associated.box.x - Camera::pos.x;
+            posY = posY + associated.box.y - Camera::pos.y;
             
             int tileIndex = At(x, y, layer);
             

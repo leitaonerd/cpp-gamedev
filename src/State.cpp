@@ -8,9 +8,9 @@
 #include <SDL3/SDL.h>
 
 State::State() : quitRequested(false){
-    //novo background
     GameObject* bgObj = new GameObject();
     SpriteRenderer* bgRenderer = new SpriteRenderer(*bgObj, "assets/img/Background.png");
+    bgRenderer->SetCameraFollower(true);
     bgObj->AddComponent(bgRenderer);
     AddObject(bgObj);
 
@@ -27,23 +27,6 @@ State::State() : quitRequested(false){
     //musica
     music.Open("assets/audio/BGM.wav");
     music.Play();
-
-    //zumbi
-    for(int i = 0; i < 3; i++){
-        GameObject* zombieObj = new GameObject();
-
-
-        //posicao qualquer
-        float min = 40;
-        float max = 600;
-        zombieObj->box.x = min + (rand() % (int)(max - min + 1));
-        zombieObj->box.y = min + (rand() % (int)(max - min + 1));
-
-        Zombie* zombieLogic = new Zombie(*zombieObj);
-        zombieObj->AddComponent(zombieLogic);
-        //coloca no gerenciador de State
-        AddObject(zombieObj);
-    }
 }
 
 State::~State(){
@@ -65,6 +48,8 @@ void State::Update(float dt){
     if(input.QuitRequested() || input.KeyPress(ESCAPE_KEY)){
         quitRequested = true;
     }
+
+    Camera::Update(dt);
 
     if(input.KeyPress(SPACE_KEY)){
         GameObject* zombieObj = new GameObject();

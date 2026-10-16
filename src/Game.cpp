@@ -1,4 +1,5 @@
 #include "Game.h"
+#include "InputManager.h"
 #include <SDL3_image/SDL_image.h>
 #include <iostream>
 
@@ -83,6 +84,7 @@ void Game::Run(){
     while (!state->QuitRequested()) {
 
         CalculateDeltaTime();
+        InputManager::GetInstance().Update();
         state->Update(GetDeltaTime());
 
         state->Render();
