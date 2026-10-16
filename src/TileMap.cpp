@@ -32,7 +32,7 @@ void TileMap::Load(std::string file) {
     
     for (int i = 0; i < totalTiles; i++) {
         std::getline(f, token, ',');
-        tileMatrix.push_back(std::stoi(token) - 1);
+        tileMatrix.push_back(std::stoi(token));
     }
 }
 
