@@ -12,6 +12,9 @@ class Sprite{
         int frameCountW;
         int frameCountH;
 
+        Vec2 scale; 
+        SDL_FlipMode flip;
+
         bool cameraFollower;
 
     public:
@@ -21,7 +24,7 @@ class Sprite{
 
         void Open(std::string file);
         void SetClip(int x, int y, int w, int h);
-        void Render(float x, float y, float w, float h);
+        void Render(float x, float y, float w, float h, double angle = 0);
 
         float GetWidth();
         float GetHeight();
@@ -29,6 +32,10 @@ class Sprite{
 
         void SetFrame(int frame);
         void SetFrameCount(int frameCountW, int frameCountH);
+
+        void SetScale(float scaleX, float scaleY);
+        Vec2 GetScale();
+        void SetFlip(SDL_FlipMode flip);
 
         void SetCameraFollower(bool follow);
 

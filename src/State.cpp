@@ -7,7 +7,7 @@
 #include "Camera.h"
 #include <SDL3/SDL.h>
 
-State::State() : quitRequested(false){
+State::State() : started (false), quitRequested(false){
     GameObject* bgObj = new GameObject();
     SpriteRenderer* bgRenderer = new SpriteRenderer(*bgObj, "assets/img/Background.png");
     bgRenderer->SetCameraFollower(true);
@@ -37,9 +37,27 @@ void State::LoadAssets(){
     //tirar depois do construtor e colocar aqui
 }
 
-void State::AddObject(GameObject* go){
-    //constroi o unique_ptr in place
-    objectArray.emplace_back(go);
+std::weak_ptr<GameObject> State::AddObject(GameObject* go){
+    std::shared_ptr<GameObject> sharedGo(go);
+    
+    objectArray.push_back(sharedGo);
+
+    if (started) {
+        sharedGo->Start();
+    }
+    
+    // Retorna uma referência "fraca" segura para quem chamou[cite: 2]
+    return std::weak_ptr<GameObject>(sharedGo);
+}
+
+std::weak_ptr<GameObject> State::GetObjectPtr(GameObject* go) {
+    for (int i = 0; i < objectArray.size(); i++) {
+        if (objectArray[i].get() == go) {
+            return std::weak_ptr<GameObject>(objectArray[i]);
+        }
+    }
+    
+    return std::weak_ptr<GameObject>();
 }
 
 void State::Update(float dt){

@@ -5,9 +5,9 @@
 #include <SDL3_image/SDL_image.h>
 #include <iostream>
 
-Sprite::Sprite() : texture(nullptr), width(0), height(0), frameCountW(1), frameCountH(1), cameraFollower(false){}
+Sprite::Sprite() : texture(nullptr), width(0), height(0), frameCountW(1), frameCountH(1), cameraFollower(false), scale(1.0f, 1.0f), flip(SDL_FLIP_NONE) {}
 
-Sprite::Sprite(std::string file, int frameCountW, int frameCountH) : texture(nullptr){
+Sprite::Sprite(std::string file, int frameCountW, int frameCountH) : texture(nullptr), cameraFollower(false), scale(1.0f, 1.0f), flip(SDL_FLIP_NONE){
     this->frameCountW = frameCountW;
     this->frameCountH = frameCountH;
     this->cameraFollower = false;
@@ -47,14 +47,14 @@ void Sprite::SetCameraFollower(bool follow) {
     cameraFollower = follow;
 }
 
-void Sprite::Render(float x, float y, float w, float h){
+void Sprite::Render(float x, float y, float w, float h, double angle){
     if (texture){
         //subtrai a camera para nao seguir
         float renderX = x - (cameraFollower ? 0 : Camera::pos.x);
         float renderY = y - (cameraFollower ? 0 : Camera::pos.y);
 
         SDL_FRect dstRect = { renderX, renderY, w, h };
-        SDL_RenderTexture(Game::GetInstance().GetRenderer(), texture, &clipRect, &dstRect);
+        SDL_RenderTextureRotated(Game::GetInstance().GetRenderer(), texture, &clipRect, &dstRect, angle, nullptr, flip);
     }
 }
 
@@ -73,14 +73,31 @@ void Sprite::SetFrame(int frame) {
     SetClip(currentX, currentY, frameW, frameH);
 }
 
-float Sprite::GetWidth(){
-    return width / frameCountW;
+float Sprite::GetWidth() {
+    return (width / frameCountW) * scale.x;
 }
 
-float Sprite::GetHeight(){
-    return height / frameCountH;
+float Sprite::GetHeight() {
+    return (height / frameCountH) * scale.y;
 }
 
 bool Sprite::IsOpen(){
     return texture != nullptr;
+}
+
+void Sprite::SetScale(float scaleX, float scaleY) {
+    if (scaleX != 0) {
+        scale.x = scaleX;
+    }
+    if (scaleY != 0) {
+        scale.y = scaleY;
+    }
+}
+
+Vec2 Sprite::GetScale() {
+    return scale;
+}
+
+void Sprite::SetFlip(SDL_FlipMode f) {
+    flip = f;
 }

@@ -9,6 +9,8 @@ class GameObject {
 private:
     std::vector<Component*> components;
     bool isDead;
+    bool started;
+    double angleDeg;
 
 public:
     Rect box;
@@ -22,6 +24,7 @@ public:
     void RequestDelete();
     void AddComponent(Component* cpt);
     void RemoveComponent(Component* cpt);
+    void Start();
 
     //implementação do template para retornar o tipo certo
     template<typename T>
