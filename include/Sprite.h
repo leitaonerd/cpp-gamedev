@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <SDL3/SDL.h>
+#include "Vec2.h"
 
 class Sprite{
     private:

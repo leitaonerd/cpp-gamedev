@@ -5,6 +5,9 @@
 #include "TileSet.h"
 #include "InputManager.h"
 #include "Camera.h"
+#include "Character.h"
+#include "Gun.h"
+#include "PlayerController.h"
 #include <SDL3/SDL.h>
 
 State::State() : started (false), quitRequested(false){
@@ -27,14 +30,44 @@ State::State() : started (false), quitRequested(false){
     //musica
     music.Open("assets/audio/BGM.wav");
     music.Play();
+
+    //player
+    GameObject* playerObj = new GameObject();
+    playerObj->box.x = 1280;
+    playerObj->box.y = 1280;
+    playerObj->box.w = 32;
+    playerObj->box.h = 32;
+
+    SpriteRenderer* playerRenderer = new SpriteRenderer(*playerObj, "assets/img/Player.png", 4, 1);
+    playerObj->AddComponent(playerRenderer);
+
+    Character* character = new Character(*playerObj, "assets/img/Player.png");
+    playerObj->AddComponent(character);
+
+    PlayerController* playerController = new PlayerController(*playerObj);
+    playerObj->AddComponent(playerController);
+    playerController->SetCharacter(std::weak_ptr<GameObject>());
+
+    AddObject(playerObj);
+
+    // travar foco da câmera no jogador
+    Camera::Follow(playerObj);
 }
 
 State::~State(){
-    objectArray.clear(); //unique_pointer cuida do resto
+    objectArray.clear();
 }
 
 void State::LoadAssets(){
     //tirar depois do construtor e colocar aqui
+}
+
+void State::Start(){
+    LoadAssets();
+    for (int i = 0; i < objectArray.size(); i++) {
+        objectArray[i]->Start();
+    }
+    started = true;
 }
 
 std::weak_ptr<GameObject> State::AddObject(GameObject* go){
@@ -46,7 +79,6 @@ std::weak_ptr<GameObject> State::AddObject(GameObject* go){
         sharedGo->Start();
     }
     
-    // Retorna uma referência "fraca" segura para quem chamou[cite: 2]
     return std::weak_ptr<GameObject>(sharedGo);
 }
 

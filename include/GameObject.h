@@ -26,6 +26,8 @@ public:
     void RemoveComponent(Component* cpt);
     void Start();
 
+    double GetAngleDeg() const { return angleDeg; }
+
     //implementação do template para retornar o tipo certo
     template<typename T>
     T* GetComponent() {

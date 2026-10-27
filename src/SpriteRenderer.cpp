@@ -52,5 +52,5 @@ void SpriteRenderer::SetCameraFollower(bool follow) {
 
 void SpriteRenderer::Render() {
     //repassa cordenada e dimensoes pro render do sprite
-    sprite.Render(associated.box.x, associated.box.y, associated.box.w, associated.box.h, associated.angleDeg);
+    sprite.Render(associated.box.x, associated.box.y, associated.box.w, associated.box.h, associated.GetAngleDeg());
 }

@@ -36,8 +36,14 @@ void Animator::Render() {
 }
 
 void Animator::SetAnimation(std::string name) {
+    //avoid restarting the same animation if already active
+    if (currentAnimationName == name) {
+        return;
+    }
+
     auto it = animations.find(name);
     if (it != animations.end()) {
+        currentAnimationName = name;
         frameStart = it->second.frameStart;
         frameEnd = it->second.frameEnd;
         frameTime = it->second.frameTime;

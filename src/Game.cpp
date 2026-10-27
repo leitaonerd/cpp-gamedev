@@ -81,6 +81,7 @@ float Game::GetDeltaTime() {
 
 void Game::Run(){
     frameStart = SDL_GetTicks();
+    state->Start();
     while (!state->QuitRequested()) {
 
         CalculateDeltaTime();
