@@ -33,20 +33,16 @@ State::State() : started (false), quitRequested(false){
 
     //player
     GameObject* playerObj = new GameObject();
-    playerObj->box.x = 1280;
-    playerObj->box.y = 1280;
+    playerObj->box.x = 600;
+    playerObj->box.y = 450;
     playerObj->box.w = 32;
     playerObj->box.h = 32;
-
-    SpriteRenderer* playerRenderer = new SpriteRenderer(*playerObj, "assets/img/Player.png", 4, 1);
-    playerObj->AddComponent(playerRenderer);
 
     Character* character = new Character(*playerObj, "assets/img/Player.png");
     playerObj->AddComponent(character);
 
     PlayerController* playerController = new PlayerController(*playerObj);
     playerObj->AddComponent(playerController);
-    playerController->SetCharacter(std::weak_ptr<GameObject>());
 
     AddObject(playerObj);
 

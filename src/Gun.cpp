@@ -11,8 +11,8 @@ Gun::Gun(GameObject& associated, std::weak_ptr<GameObject> character)
     SpriteRenderer* renderer = new SpriteRenderer(associated, "assets/img/Gun.png");
     associated.AddComponent(renderer);
 
-    shotSound.Open("assets/audio/PumpAction.mp3");
-    reloadSound.Open("assets/audio/Hit0.wav");
+    shotSound.Open("assets/audio/BGM.wav");
+    reloadSound.Open("assets/audio/BGM.wav");
 }
 
 void Gun::Update(float dt) {

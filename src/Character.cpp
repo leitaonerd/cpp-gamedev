@@ -11,7 +11,7 @@ Character* Character::player = nullptr;
 Character::Character(GameObject& associated, std::string sprite)
     : Component(associated), speed(0, 0), linearSpeed(200.0f), hp(100) {
     // sprite do personagem
-    SpriteRenderer* renderer = new SpriteRenderer(associated, sprite, 4, 1);
+    SpriteRenderer* renderer = new SpriteRenderer(associated, sprite, 3, 4);
     associated.AddComponent(renderer);
 
     // animações
@@ -57,7 +57,7 @@ void Character::Update(float dt) {
     }
 
     // consome fila de comandos
-    if (!taskQueue.empty()) {
+    while (!taskQueue.empty()) {
         Command cmd = taskQueue.front();
         taskQueue.pop();
 

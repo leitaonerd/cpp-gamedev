@@ -7,11 +7,9 @@
 PlayerController::PlayerController(GameObject& associated) : Component(associated) {}
 
 void PlayerController::Update(float dt) {
-    auto charObj = character.lock();
-    if (!charObj) return;
 
-    Character* characterComp = charObj->GetComponent<Character>();
-    if (!characterComp) return;
+    Character* characterComp = associated.GetComponent<Character>();
+    if (characterComp == nullptr) return;
 
     InputManager& input = InputManager::GetInstance();
 

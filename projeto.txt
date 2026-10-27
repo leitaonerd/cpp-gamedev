@@ -1,0 +1,1910 @@
+#include "Animator.h"
+#include "GameObject.h"
+#include "SpriteRenderer.h"
+
+Animator::Animator(GameObject& associated) 
+    : Component(associated), frameStart(0), frameEnd(0), frameTime(0.0f), currentFrame(0), timeElapsed(0.0f) {
+}
+
+void Animator::Update(float dt) {
+    //se frameTime for 0, não tem animação
+    if (frameTime == 0.0f) {
+        return; 
+    }
+
+    timeElapsed += dt; //mudar depois pelo delta time de vdd
+
+    //passou mais tempo que o tempo do frame
+    if (timeElapsed > frameTime) {
+        currentFrame++;
+        timeElapsed -= frameTime;
+
+        //passou do ultimo quadro
+        if (currentFrame > frameEnd) {
+            currentFrame = frameStart;
+        }
+
+        //atualiza o frame no SpriteRenderer do mesmo objeto
+        SpriteRenderer* sprite = associated.GetComponent<SpriteRenderer>();
+        if (sprite != nullptr) {
+            sprite->SetFrame(currentFrame);
+        }
+    }
+}
+
+void Animator::Render() {
+}
+
+void Animator::SetAnimation(std::string name) {
+    //avoid restarting the same animation if already active
+    if (currentAnimationName == name) {
+        return;
+    }
+
+    auto it = animations.find(name);
+    if (it != animations.end()) {
+        currentAnimationName = name;
+        frameStart = it->second.frameStart;
+        frameEnd = it->second.frameEnd;
+        frameTime = it->second.frameTime;
+
+        currentFrame = frameStart;
+        timeElapsed = 0.0f;
+
+        //chama SetFrame no SpriteRenderer
+        SpriteRenderer* sprite = associated.GetComponent<SpriteRenderer>();
+        if (sprite != nullptr) {
+            sprite->SetFrame(currentFrame);
+        }
+    }
+}
+
+void Animator::AddAnimation(std::string name, Animation anim) {
+    //insere o par se não encontrar a animação no mapa
+    if (animations.find(name) == animations.end()) {
+        animations[name] = anim; 
+    }
+}
+#include "Bullet.h"
+#include "GameObject.h"
+#include "SpriteRenderer.h"
+#include <cmath>
+
+Bullet::Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance)
+    : Component(associated), distanceLeft(maxDistance), damage(damage) {
+
+    SpriteRenderer* renderer = new SpriteRenderer(associated, "assets/img/Bullet.png");
+    associated.AddComponent(renderer);
+
+    // calcula velocidade a partir do angulo
+    float rad = angle * 3.14159265f / 180.0f;
+    this->speed = Vec2(std::cos(rad) * speed, std::sin(rad) * speed);
+
+    associated.box.w = 8;
+    associated.box.h = 8;
+}
+
+void Bullet::Update(float dt) {
+    associated.box.x += speed.x * dt;
+    associated.box.y += speed.y * dt;
+    distanceLeft -= this->speed.Magnitude() * dt;
+
+    if (distanceLeft <= 0) {
+        associated.RequestDelete();
+    }
+}
+
+void Bullet::Render() {}
+
+int Bullet::GetDamage() {
+    return damage;
+}
+#include "Camera.h"
+#include "InputManager.h"
+
+Vec2 Camera::pos;
+Vec2 Camera::speed;
+GameObject* Camera::focus = nullptr;
+
+void Camera::Follow(GameObject* newFocus){
+    focus = newFocus;
+}
+
+void Camera::Unfollow(){
+    focus = nullptr;
+}
+
+void Camera::Update(float dt){
+    if(focus != nullptr) {
+        pos.x = focus->box.Center().x - 600.0f;
+        pos.y = focus->box.Center().y - 450.0f;
+    } 
+    else{
+        InputManager& input = InputManager::GetInstance();
+        
+        float camSpeed = 300.0f; 
+        
+        speed = Vec2(0, 0);
+
+        if(input.IsKeyDown(LEFT_ARROW_KEY)){
+            speed.x = -camSpeed;
+        }
+        if(input.IsKeyDown(RIGHT_ARROW_KEY)){
+            speed.x = camSpeed;
+        }
+        if(input.IsKeyDown(UP_ARROW_KEY)){
+            speed.y = -camSpeed;
+        }
+        if(input.IsKeyDown(DOWN_ARROW_KEY)){
+            speed.y = camSpeed;
+        }
+
+        pos.x += speed.x * dt;
+        pos.y += speed.y * dt;
+    }
+}
+#include "Character.h"
+#include "GameObject.h"
+#include "Gun.h"
+#include "SpriteRenderer.h"
+#include "Animator.h"
+#include "Animation.h"
+#include "Game.h"
+
+Character* Character::player = nullptr;
+
+Character::Character(GameObject& associated, std::string sprite)
+    : Component(associated), speed(0, 0), linearSpeed(200.0f), hp(100) {
+    // sprite do personagem
+    SpriteRenderer* renderer = new SpriteRenderer(associated, sprite, 1, 4);
+    associated.AddComponent(renderer);
+
+    // animações
+    Animator* animator = new Animator(associated);
+    animator->AddAnimation("idle", Animation(0, 0, 0.0f));
+    animator->AddAnimation("walking", Animation(0, 3, 0.1f));
+    animator->AddAnimation("dead", Animation(0, 0, 0.0f));
+    associated.AddComponent(animator);
+    animator->SetAnimation("idle");
+
+    // registra instância global do jogador
+    player = this;
+}
+
+Character::~Character() {
+    player = nullptr;
+}
+
+void Character::Start() {
+    // cria a arma como objeto separado no State
+    GameObject* gunObj = new GameObject();
+    Gun* gunComp = new Gun(*gunObj, std::weak_ptr<GameObject>());
+    gunObj->AddComponent(gunComp);
+    Game::GetInstance().GetState().AddObject(gunObj);
+
+    // guarda referência fraca para a arma
+    std::weak_ptr<GameObject> gunWeak = Game::GetInstance().GetState().GetObjectPtr(gunObj);
+    gun = gunWeak;
+}
+
+void Character::Update(float dt) {
+    if (hp <= 0) {
+        // animação de morte
+        Animator* animator = associated.GetComponent<Animator>();
+        if (animator) {
+            animator->SetAnimation("dead");
+        }
+        deathTimer.Update(dt);
+        if (deathTimer.Get() >= 1.0f) {
+            associated.RequestDelete();
+        }
+        return;
+    }
+
+    // consome fila de comandos
+    if (!taskQueue.empty()) {
+        Command cmd = taskQueue.front();
+        taskQueue.pop();
+
+        if (cmd.type == Command::MOVE) {
+            speed = cmd.pos.GetNormalized() * linearSpeed;
+
+            // orienta animação de movimento
+            Animator* animator = associated.GetComponent<Animator>();
+            if (animator) {
+                animator->SetAnimation("walking");
+            }
+        } else if (cmd.type == Command::SHOOT) {
+            auto gunObj = gun.lock();
+            if (gunObj) {
+                Gun* gunComp = gunObj->GetComponent<Gun>();
+                if (gunComp) {
+                    gunComp->Shoot(cmd.pos);
+                }
+            }
+
+            Animator* animator = associated.GetComponent<Animator>();
+            if (animator) {
+                animator->SetAnimation("idle");
+            }
+        }
+    }
+
+    // aplica movimento
+    associated.box.x += speed.x * dt;
+    associated.box.y += speed.y * dt;
+
+    // atrito para desacelerar suavemente
+    speed.x *= 0.90f;
+    speed.y *= 0.90f;
+
+    // se parou, volta para idle
+    if (speed.Magnitude() < 1.0f) {
+        Animator* animator = associated.GetComponent<Animator>();
+        if (animator) {
+            animator->SetAnimation("idle");
+        }
+    }
+}
+
+void Character::Render() {}
+
+void Character::Issue(Command task) {
+    taskQueue.push(task);
+}
+#include "Command.h"
+
+Command::Command(CommandType type, float x, float y)
+    : type(type), pos(x, y) {}
+#include "Game.h"
+#include "InputManager.h"
+#include <SDL3_image/SDL_image.h>
+#include <iostream>
+
+Game* Game::instance = nullptr;
+
+Game& Game::GetInstance(){
+    if(instance == nullptr){
+        instance = new Game("Rafael Medeiros de Alencar - 241020760", 1200, 900);
+    }
+    return *instance;
+}
+
+Game::Game(std::string title, int width, int height){
+    if(instance != nullptr){
+        std::cerr << "Erro na lógica do jogo. Instância de jogo já existe" << std::endl;
+        //erro tratar depois
+        return;
+    }
+    instance = this;    
+
+    //core SDL3 subsystems
+    if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)){
+        std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
+    }
+    //retirei check de load das imagens pq aparentemente removeram as funções
+    if (!MIX_Init()) { 
+    std::cerr << "MIX_Init Error: " << SDL_GetError() << std::endl;
+}
+    //SDL3_mixer device
+    mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
+    if(mixer == nullptr){
+        std::cerr << "Mixer Error: " << SDL_GetError() << std::endl;
+    }
+    //SDL3 window
+    window = SDL_CreateWindow(title.c_str(), width, height, 0);
+    if(window == nullptr){
+        std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
+    }
+    //SDL3 renderer
+    renderer = SDL_CreateRenderer(window, nullptr);
+    if(renderer == nullptr){
+        std::cerr << "SDL_CreateRenderer Error: " << SDL_GetError() << std::endl;
+    }
+
+    state = new State();
+}
+
+Game::~Game(){
+    delete state;
+    if(mixer) MIX_DestroyMixer(mixer);
+    MIX_Quit();
+    //IMG_Quit();
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit(); 
+}
+
+State& Game::GetState(){
+    return *state;
+}
+
+SDL_Renderer* Game::GetRenderer(){
+    return renderer;
+}
+
+MIX_Mixer* Game::GetMixer(){
+    return mixer;
+}
+
+void Game::CalculateDeltaTime() {
+    Uint64 currentTime = SDL_GetTicks();
+    dt = (currentTime - frameStart) / 1000.0f;
+    frameStart = currentTime;
+}
+
+float Game::GetDeltaTime() {
+    return dt;
+}
+
+void Game::Run(){
+    frameStart = SDL_GetTicks();
+    state->Start();
+    while (!state->QuitRequested()) {
+
+        CalculateDeltaTime();
+        InputManager::GetInstance().Update();
+        state->Update(GetDeltaTime());
+
+        state->Render();
+        SDL_RenderPresent(renderer);
+        SDL_Delay(33); //30 fps
+    }
+}
+#include "GameObject.h"
+#include <algorithm>
+
+GameObject::GameObject() : isDead(false), started(false), angleDeg(0.0) {}
+
+GameObject::~GameObject() {
+    for (int i = components.size() - 1; i >= 0; i--){
+        delete components[i];
+    }
+    components.clear();
+}
+
+void GameObject::Start() {
+    for (int i = 0; i < components.size(); i++) {
+        components[i]->Start();
+    }
+    started = true;
+}
+
+void GameObject::Update(float dt) {
+    for (int i = 0; i < components.size(); i++){
+        components[i]->Update(dt);
+    }
+}
+
+void GameObject::Render() {
+    for (int i = 0; i < components.size(); i++){
+        components[i]->Render();
+    }
+}
+
+bool GameObject::IsDead(){
+    return isDead;
+}
+
+void GameObject::RequestDelete(){
+    isDead = true;
+}
+
+void GameObject::AddComponent(Component* cpt){
+    components.emplace_back(cpt);
+    if (started) {
+        cpt->Start();
+    }
+}
+
+void GameObject::RemoveComponent(Component* cpt){
+    auto it = std::find(components.begin(), components.end(), cpt);
+    if (it != components.end()) {
+        components.erase(it);
+    }
+}
+#include "Gun.h"
+#include "GameObject.h"
+#include "Bullet.h"
+#include "SpriteRenderer.h"
+#include "Game.h"
+#include <cmath>
+
+Gun::Gun(GameObject& associated, std::weak_ptr<GameObject> character)
+    : Component(associated), character(character), cooldownState(0), angle(0.0f) {
+    // sprite da arma
+    SpriteRenderer* renderer = new SpriteRenderer(associated, "assets/img/Gun.png");
+    associated.AddComponent(renderer);
+
+    shotSound.Open("assets/audio/BGM.wav");
+    reloadSound.Open("assets/audio/BGM.wav");
+}
+
+void Gun::Update(float dt) {
+    cdTimer.Update(dt);
+
+    auto charObj = character.lock();
+    if (!charObj) {
+        associated.RequestDelete();
+        return;
+    }
+
+    // sincroniza a posição da arma com o personagem
+    Vec2 center = charObj->box.Center();
+    associated.box.x = center.x - associated.box.w / 2.0f;
+    associated.box.y = center.y - associated.box.h / 2.0f;
+
+    // aplica deslocamento na direção do ângulo
+    float rad = angle * 3.14159265f / 180.0f;
+    associated.box.x += std::cos(rad) * 12.0f;
+    associated.box.y += std::sin(rad) * 12.0f;
+
+    // máquina de estados de cooldown (0 a 3)
+    if (cooldownState == 1) {
+        // disparo efetuado, entrando em recarga
+        if (cdTimer.Get() >= 0.2f) {
+            cooldownState = 2;
+            cdTimer.Restart();
+            reloadSound.Play(1);
+        }
+    } else if (cooldownState == 2) {
+        // animação de recarga (pump-action)
+        if (cdTimer.Get() >= 0.5f) {
+            cooldownState = 3;
+            cdTimer.Restart();
+        }
+    } else if (cooldownState == 3) {
+        // fim da recarga, pronto para atirar novamente
+        cooldownState = 0;
+    }
+}
+
+void Gun::Render() {}
+
+void Gun::Shoot(Vec2 target) {
+    if (cooldownState != 0) {
+        return;
+    }
+
+    // calcula ângulo para o alvo
+    Vec2 pos = associated.box.Center();
+    Vec2 dir = target - pos;
+    angle = dir.Inclination() * 180.0f / 3.14159265f;
+
+    shotSound.Play(1);
+
+    // instancia projétil
+    GameObject* bulletObj = new GameObject();
+    bulletObj->box.x = pos.x - 4;
+    bulletObj->box.y = pos.y - 4;
+
+    float speed = 500.0f;
+    int damage = 25;
+    float maxDistance = 600.0f;
+
+    Bullet* bullet = new Bullet(*bulletObj, angle, speed, damage, maxDistance);
+    bulletObj->AddComponent(bullet);
+
+    Game::GetInstance().GetState().AddObject(bulletObj);
+
+    // entra em cooldown
+    cooldownState = 1;
+    cdTimer.Restart();
+}
+#include "InputManager.h"
+
+//singleton
+InputManager& InputManager::GetInstance() {
+    static InputManager instance;
+    return instance;
+}
+
+InputManager::InputManager() : quitRequested(false), updateCounter(0), mouseX(0), mouseY(0) {
+    for (int i = 0; i < 6; i++) {
+        mouseState[i] = false;
+        mouseUpdate[i] = 0;
+    } //só tem 5 botoes principais na SDL3
+}
+
+InputManager::~InputManager() {
+}
+
+void InputManager::Update() {
+    SDL_Event event;
+
+    float fX, fY;
+    SDL_GetMouseState(&fX, &fY);
+    mouseX = static_cast<int>(fX);
+    mouseY = static_cast<int>(fY);
+
+    quitRequested = false;
+    updateCounter++;
+
+    while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_EVENT_QUIT) {
+            quitRequested = true;
+        }
+        else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+            int button = event.button.button;
+            mouseState[button] = (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
+            mouseUpdate[button] = updateCounter;
+        }
+
+        else if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
+            // ignora o auto-repeat quando segura tecla
+            if (!event.key.repeat) {
+                // Em SDL3 a tecla é acessada via event.key.key (em SDL2 era event.key.keysym.sym)
+                int key = event.key.key;
+                
+                // unordered_map cria o elemento automaticamente se não existir
+                keyState[key] = (event.type == SDL_EVENT_KEY_DOWN);
+                keyUpdate[key] = updateCounter;
+            }
+        }
+    }
+}
+
+bool InputManager::KeyPress(int key) {
+    return keyState[key] && (keyUpdate[key] == updateCounter);
+}
+
+bool InputManager::KeyRelease(int key) {
+    return !keyState[key] && (keyUpdate[key] == updateCounter);
+}
+
+bool InputManager::IsKeyDown(int key) {
+    return keyState[key];
+}
+
+bool InputManager::MousePress(int button) {
+    return mouseState[button] && (mouseUpdate[button] == updateCounter);
+}
+
+bool InputManager::MouseRelease(int button) {
+    return !mouseState[button] && (mouseUpdate[button] == updateCounter);
+}
+
+bool InputManager::IsMouseDown(int button) {
+    return mouseState[button];
+}
+
+int InputManager::GetMouseX() {
+    return mouseX;
+}
+
+int InputManager::GetMouseY() {
+    return mouseY;
+}
+
+bool InputManager::QuitRequested() {
+    return quitRequested;
+}
+#include "Game.h"
+
+int main(int argc, char* argv[]){
+
+    Game::GetInstance().Run();
+
+    return 0;
+}
+#include "Music.h"
+#include "Game.h"
+#include "Resources.h"
+#include <iostream>
+
+
+Music::Music(){
+    audio = nullptr;
+    track = nullptr;
+}
+
+Music::Music(std::string file){
+    audio = nullptr;
+    track = nullptr;
+    Open(file);
+}
+
+Music::~Music(){
+    if(IsOpen()){
+        Stop(0);
+        if(track) MIX_DestroyTrack(track); 
+    }
+}
+
+void Music::Play(int times){
+    if(IsOpen()){
+        SDL_PropertiesID props = SDL_CreateProperties();
+        SDL_SetNumberProperty(props, MIX_PROP_PLAY_LOOPS_NUMBER, times);
+        
+        MIX_PlayTrack(track, props);
+        
+        SDL_DestroyProperties(props);
+    } else{
+        std::cerr << "Nenhuma musica carregada. Audio nao pode ser reproduzido" << std::endl;
+    }
+}
+
+void Music::Stop(int msToStop){
+    if(track){
+        MIX_StopTrack(track, msToStop);
+    }
+}
+
+void Music::Open(std::string file){
+    MIX_Mixer* mixer = Game::GetInstance().GetMixer();
+
+    audio = Resources::GetAudio(file);
+
+    if(audio == nullptr){
+        std::cerr << "MIX_LoadAudio Error: " << SDL_GetError() << std::endl;
+        return;
+    }
+
+    //cria uma track no mixer e faz o assign do arquivo de audio pra ela
+    track = MIX_CreateTrack(mixer);
+    MIX_SetTrackAudio(track, audio);
+}
+
+bool Music::IsOpen() {
+    return audio != nullptr;
+}
+#include "PlayerController.h"
+#include "GameObject.h"
+#include "Character.h"
+#include "InputManager.h"
+#include "Camera.h"
+
+PlayerController::PlayerController(GameObject& associated) : Component(associated) {}
+
+void PlayerController::Update(float dt) {
+    auto charObj = character.lock();
+    if (!charObj) return;
+
+    Character* characterComp = charObj->GetComponent<Character>();
+    if (!characterComp) return;
+
+    InputManager& input = InputManager::GetInstance();
+
+    Vec2 moveDir(0, 0);
+    if (input.IsKeyDown(SDLK_W) || input.IsKeyDown(UP_ARROW_KEY)) moveDir.y -= 1;
+    if (input.IsKeyDown(SDLK_S) || input.IsKeyDown(DOWN_ARROW_KEY)) moveDir.y += 1;
+    if (input.IsKeyDown(SDLK_A) || input.IsKeyDown(LEFT_ARROW_KEY)) moveDir.x -= 1;
+    if (input.IsKeyDown(SDLK_D) || input.IsKeyDown(RIGHT_ARROW_KEY)) moveDir.x += 1;
+
+    if (moveDir.x != 0 || moveDir.y != 0) {
+        characterComp->Issue(Command(Command::MOVE, moveDir.x, moveDir.y));
+    }
+
+    if (input.MousePress(LEFT_MOUSE_BUTTON)) {
+        Vec2 target(input.GetMouseX(), input.GetMouseY());
+        target.x += Camera::pos.x;
+        target.y += Camera::pos.y;
+        characterComp->Issue(Command(Command::SHOOT, target.x, target.y));
+    }
+}
+
+void PlayerController::Render() {}
+
+void PlayerController::SetCharacter(std::weak_ptr<GameObject> newCharacter) {
+    character = newCharacter;
+}
+#include "Rect.h"
+
+Rect::Rect() : x(0), y(0), w(0), h(0) {}
+Rect::Rect(float x, float y, float w, float h) : x(x), y(y), w(w), h(h) {}
+
+Vec2 Rect::Center() const{
+    return Vec2(x + w / 2.0f, y + h / 2.0f);
+}
+
+float Rect::Distance(const Rect& dst) const{
+    return Center().Distance(dst.Center());
+}
+
+bool Rect::Contains(float pX, float pY) const{
+    return (pX >= x && pX <= x + w && pY >= y && pY <= y + h);
+}
+
+bool Rect::Contains(const Vec2& p) const{
+    return Contains(p.x, p.y);
+}
+
+Rect Rect::operator+(const Vec2& rhs) const{
+    return Rect(x + rhs.x, y + rhs.y, w, h);
+}
+#include "Resources.h"
+#include "Game.h"
+#include <SDL3_image/SDL_image.h>
+#include <iostream>
+
+//inicializao doq eh estatico fora da classe
+std::unordered_map<std::string, SDL_Texture*> Resources::imageTable;
+std::unordered_map<std::string, MIX_Audio*> Resources::audioTable;
+
+SDL_Texture* Resources::GetImage(std::string file) {
+    auto it = imageTable.find(file);
+    
+    if (it == imageTable.end()) {
+        SDL_Renderer* renderer = Game::GetInstance().GetRenderer();
+        SDL_Texture* texture = IMG_LoadTexture(renderer, file.c_str());
+        
+        if (texture == nullptr) {
+            std::cerr << "Erro ao carregar textura: " << SDL_GetError() << std::endl;
+            return nullptr;
+        }
+        
+        imageTable[file] = texture;
+        return texture;
+    }
+    
+    //se ja existe retorna o ponteiro do cache
+    return it->second;
+}
+
+MIX_Audio* Resources::GetAudio(std::string file) {
+    auto it = audioTable.find(file);
+
+    if (it == audioTable.end()) {
+        MIX_Mixer* mixer = Game::GetInstance().GetMixer();
+        MIX_Audio* audio = MIX_LoadAudio(mixer, file.c_str(), true);
+        
+        if (audio == nullptr) {
+            std::cerr << "Erro ao carregar audio: " << SDL_GetError() << std::endl;
+            return nullptr;
+        }
+        
+        audioTable[file] = audio;
+        return audio;
+    }
+    
+    return it->second;
+}
+
+void Resources::ClearImages() {
+    for (auto it = imageTable.begin(); it != imageTable.end(); it++) {
+        if (it->second != nullptr) {
+            SDL_DestroyTexture(it->second);
+        }
+    }
+    imageTable.clear();
+}
+
+void Resources::ClearAudios() {
+    for (auto it = audioTable.begin(); it != audioTable.end(); it++) {
+        if (it->second != nullptr) {
+            MIX_DestroyAudio(it->second);
+        }
+    }
+    audioTable.clear();
+}
+
+void Resources::ClearAll() {
+    ClearImages();
+    ClearAudios();
+}
+#include "Sound.h"
+#include "Game.h"
+#include "Resources.h"
+#include <iostream>
+
+Sound::Sound() {
+    audio = nullptr;
+    track = nullptr;
+}
+
+Sound::Sound(std::string file) {
+    audio = nullptr;
+    track = nullptr;
+    Open(file);
+}
+
+Sound::~Sound() {
+    if(IsOpen()) {
+        Stop();
+        if(track) MIX_DestroyTrack(track);
+    }
+}
+
+void Sound::Play(int times) {
+    if(IsOpen()) {
+        SDL_PropertiesID props = SDL_CreateProperties();
+        
+        // Se times = 1, loops = 0 (toca apenas a vez original)
+        SDL_SetNumberProperty(props, MIX_PROP_PLAY_LOOPS_NUMBER, times - 1);
+        
+        MIX_PlayTrack(track, props);
+        
+        SDL_DestroyProperties(props);
+    } else {
+        std::cerr << "Nenhum som carregado. Audio nao pode ser reproduzido" << std::endl;
+    }
+}
+
+void Sound::Stop() {
+    if(track) {
+        // Efeitos sonoros param instantaneamente (0 ms)
+        MIX_StopTrack(track, 0); 
+    }
+}
+
+void Sound::Open(std::string file) {
+    MIX_Mixer* mixer = Game::GetInstance().GetMixer();
+
+    audio = Resources::GetAudio(file);
+
+    if(audio == nullptr) {
+        std::cerr << "MIX_LoadAudio Error: " << SDL_GetError() << std::endl;
+        return;
+    }
+
+    track = MIX_CreateTrack(mixer);
+    MIX_SetTrackAudio(track, audio);
+}
+
+bool Sound::IsOpen() {
+    return audio != nullptr;
+}
+#include "Sprite.h"
+#include "Game.h"
+#include "Resources.h"
+#include "Camera.h"
+#include <SDL3_image/SDL_image.h>
+#include <iostream>
+
+Sprite::Sprite() : texture(nullptr), width(0), height(0), frameCountW(1), frameCountH(1), cameraFollower(false), scale(1.0f, 1.0f), flip(SDL_FLIP_NONE) {}
+
+Sprite::Sprite(std::string file, int frameCountW, int frameCountH) : texture(nullptr), cameraFollower(false), scale(1.0f, 1.0f), flip(SDL_FLIP_NONE){
+    this->frameCountW = frameCountW;
+    this->frameCountH = frameCountH;
+    this->cameraFollower = false;
+    Open(file);
+}
+
+Sprite::~Sprite(){
+    if(texture){
+        //SDL_DestroyTexture(texture);
+    }
+}
+
+void Sprite::Open(std::string file){
+    texture = Resources::GetImage(file);
+    if (texture == nullptr){
+        std::cerr << "IMG_LoadTexture Error: " << SDL_GetError() << std::endl;
+        return;
+    }
+
+    //SDL_QueryTexture foi substituído por obter as propriedades via float
+    float fWidth, fHeight;
+    SDL_GetTextureSize(texture, &fWidth, &fHeight);
+    width = static_cast<int>(fWidth);
+    height = static_cast<int>(fHeight);
+
+    SetFrame(0); //0 eh padrao
+}
+
+void Sprite::SetClip(int x, int y, int w, int h){
+    clipRect.x = static_cast<float>(x);
+    clipRect.y = static_cast<float>(y);
+    clipRect.w = static_cast<float>(w);
+    clipRect.h = static_cast<float>(h);
+}
+
+void Sprite::SetCameraFollower(bool follow) {
+    cameraFollower = follow;
+}
+
+void Sprite::Render(float x, float y, float w, float h, double angle){
+    if (texture){
+        //subtrai a camera para nao seguir
+        float renderX = x - (cameraFollower ? 0 : Camera::pos.x);
+        float renderY = y - (cameraFollower ? 0 : Camera::pos.y);
+
+        SDL_FRect dstRect = { renderX, renderY, w, h };
+        SDL_RenderTextureRotated(Game::GetInstance().GetRenderer(), texture, &clipRect, &dstRect, angle, nullptr, flip);
+    }
+}
+
+void Sprite::SetFrameCount(int frameCountW, int frameCountH){
+    this->frameCountW = frameCountW;
+    this->frameCountH = frameCountH;
+}
+
+void Sprite::SetFrame(int frame) {
+    int frameW = GetWidth();
+    int frameH = GetHeight();
+    
+    int currentX = (frame % frameCountW) * frameW;
+    int currentY = (frame / frameCountW) * frameH;
+    
+    SetClip(currentX, currentY, frameW, frameH);
+}
+
+float Sprite::GetWidth() {
+    return (width / frameCountW) * scale.x;
+}
+
+float Sprite::GetHeight() {
+    return (height / frameCountH) * scale.y;
+}
+
+bool Sprite::IsOpen(){
+    return texture != nullptr;
+}
+
+void Sprite::SetScale(float scaleX, float scaleY) {
+    if (scaleX != 0) {
+        scale.x = scaleX;
+    }
+    if (scaleY != 0) {
+        scale.y = scaleY;
+    }
+}
+
+Vec2 Sprite::GetScale() {
+    return scale;
+}
+
+void Sprite::SetFlip(SDL_FlipMode f) {
+    flip = f;
+}
+#include "SpriteRenderer.h"
+#include "GameObject.h"
+#include "Camera.h"
+
+SpriteRenderer::SpriteRenderer(GameObject& associated) 
+    : Component(associated) {
+}
+
+SpriteRenderer::SpriteRenderer(GameObject& associated, std::string file, int frameCountW, int frameCountH) 
+    : Component(associated), sprite(file, frameCountW, frameCountH) {
+    
+    associated.box.w = sprite.GetWidth();
+    associated.box.h = sprite.GetHeight();
+    
+    SetFrame(0);
+}
+
+void SpriteRenderer::Open(std::string file) {
+    sprite.Open(file);
+    //atualiza as dimensoes sempre q abre outro arquivo
+    associated.box.w = sprite.GetWidth();
+    associated.box.h = sprite.GetHeight();
+}
+
+void SpriteRenderer::SetFrameCount(int frameCountW, int frameCountH) {
+    sprite.SetFrameCount(frameCountW, frameCountH);
+}
+
+void SpriteRenderer::SetFrame(int frame, SDL_FlipMode flip) {
+    sprite.SetFrame(frame);
+    sprite.SetFlip(flip);
+}
+
+void SpriteRenderer::SetScale(float scaleX, float scaleY) {
+    Vec2 center = associated.box.Center(); 
+    
+    sprite.SetScale(scaleX, scaleY); 
+    
+    associated.box.w = sprite.GetWidth();
+    associated.box.h = sprite.GetHeight();
+    
+    associated.box.x = center.x - (associated.box.w / 2.0f);
+    associated.box.y = center.y - (associated.box.h / 2.0f);
+}
+
+void SpriteRenderer::Update(float dt) {
+}
+
+void SpriteRenderer::SetCameraFollower(bool follow) {
+    sprite.SetCameraFollower(follow);
+}
+
+void SpriteRenderer::Render() {
+    //repassa cordenada e dimensoes pro render do sprite
+    sprite.Render(associated.box.x, associated.box.y, associated.box.w, associated.box.h, associated.GetAngleDeg());
+}
+#include "State.h"
+#include "SpriteRenderer.h"
+#include "Zombie.h"
+#include "TileMap.h"
+#include "TileSet.h"
+#include "InputManager.h"
+#include "Camera.h"
+#include "Character.h"
+#include "Gun.h"
+#include "PlayerController.h"
+#include <SDL3/SDL.h>
+
+State::State() : started (false), quitRequested(false){
+    GameObject* bgObj = new GameObject();
+    SpriteRenderer* bgRenderer = new SpriteRenderer(*bgObj, "assets/img/Background.png");
+    bgRenderer->SetCameraFollower(true);
+    bgObj->AddComponent(bgRenderer);
+    AddObject(bgObj);
+
+    //mapa
+    GameObject* mapObj = new GameObject();
+    mapObj->box.x = 0;
+    mapObj->box.y = 0;
+    
+    TileSet* tileSet = new TileSet(64, 64, "assets/img/Tileset.png");
+    TileMap* tileMap = new TileMap(*mapObj, "assets/map/map.txt", tileSet);
+    mapObj->AddComponent(tileMap);
+    AddObject(mapObj);
+
+    //musica
+    music.Open("assets/audio/BGM.wav");
+    music.Play();
+
+    //player
+    GameObject* playerObj = new GameObject();
+    playerObj->box.x = 600;
+    playerObj->box.y = 450;
+    playerObj->box.w = 32;
+    playerObj->box.h = 32;
+
+    SpriteRenderer* playerRenderer = new SpriteRenderer(*playerObj, "assets/img/Player.png", 4, 1);
+    playerObj->AddComponent(playerRenderer);
+
+    Character* character = new Character(*playerObj, "assets/img/Player.png");
+    playerObj->AddComponent(character);
+
+    PlayerController* playerController = new PlayerController(*playerObj);
+    playerObj->AddComponent(playerController);
+    playerController->SetCharacter(std::weak_ptr<GameObject>());
+
+    AddObject(playerObj);
+
+    // travar foco da câmera no jogador
+    Camera::Follow(playerObj);
+}
+
+State::~State(){
+    objectArray.clear();
+}
+
+void State::LoadAssets(){
+    //tirar depois do construtor e colocar aqui
+}
+
+void State::Start(){
+    LoadAssets();
+    for (int i = 0; i < objectArray.size(); i++) {
+        objectArray[i]->Start();
+    }
+    started = true;
+}
+
+std::weak_ptr<GameObject> State::AddObject(GameObject* go){
+    std::shared_ptr<GameObject> sharedGo(go);
+    
+    objectArray.push_back(sharedGo);
+
+    if (started) {
+        sharedGo->Start();
+    }
+    
+    return std::weak_ptr<GameObject>(sharedGo);
+}
+
+std::weak_ptr<GameObject> State::GetObjectPtr(GameObject* go) {
+    for (int i = 0; i < objectArray.size(); i++) {
+        if (objectArray[i].get() == go) {
+            return std::weak_ptr<GameObject>(objectArray[i]);
+        }
+    }
+    
+    return std::weak_ptr<GameObject>();
+}
+
+void State::Update(float dt){
+    InputManager& input = InputManager::GetInstance();
+    
+    if(input.QuitRequested() || input.KeyPress(ESCAPE_KEY)){
+        quitRequested = true;
+    }
+
+    Camera::Update(dt);
+
+    if(input.KeyPress(SPACE_KEY)){
+        GameObject* zombieObj = new GameObject();
+        
+        zombieObj->box.x = input.GetMouseX() + Camera::pos.x - (zombieObj->box.w / 2.0f);
+        zombieObj->box.y = input.GetMouseY() + Camera::pos.y - (zombieObj->box.h / 2.0f);
+
+        Zombie* zombieLogic = new Zombie(*zombieObj);
+        zombieObj->AddComponent(zombieLogic);
+        AddObject(zombieObj);
+    }
+
+    Camera::Update(dt);
+
+    for(int i = 0; i < objectArray.size(); i++){
+        objectArray[i]->Update(dt);
+    }
+
+    for(int i = 0; i < objectArray.size(); i++){
+        if(objectArray[i]->IsDead()){
+            objectArray.erase(objectArray.begin() + i);
+            i--; 
+        }
+    }
+}
+
+void State::Render(){
+    for(int i = 0; i < objectArray.size(); i++){
+        objectArray[i]->Render();
+    }
+}
+
+bool State::QuitRequested(){
+    return quitRequested;
+}
+#include "TileMap.h"
+#include "GameObject.h"
+#include <fstream>
+#include <sstream>
+#include <iostream>
+
+TileMap::TileMap(GameObject& associated, std::string file, TileSet* tileSet) 
+    : Component(associated) {
+    SetTileSet(tileSet);
+    Load(file);
+}
+
+void TileMap::Load(std::string file) {
+    std::ifstream f(file);
+    if (!f.is_open()) {
+        std::cerr << "Erro ao abrir o mapa: " << file << std::endl;
+        return;
+    }
+
+    std::string token;
+    
+    std::getline(f, token, ',');
+    mapWidth = std::stoi(token);
+    
+    std::getline(f, token, ',');
+    mapHeight = std::stoi(token);
+    
+    std::getline(f, token, ',');
+    mapDepth = std::stoi(token);
+
+    int totalTiles = mapWidth * mapHeight * mapDepth;
+    
+    for (int i = 0; i < totalTiles; i++) {
+        std::getline(f, token, ',');
+        tileMatrix.push_back(std::stoi(token));
+    }
+}
+
+void TileMap::SetTileSet(TileSet* tileSet) {
+    // O unique_ptr assume a posse do ponteiro usando reset
+    this->tileSet.reset(tileSet);
+}
+
+int& TileMap::At(int x, int y, int z) {
+    // Converte a coordenada 3D num índice de matriz unidimensional
+    int index = x + (y * mapWidth) + (z * mapWidth * mapHeight);
+    return tileMatrix[index];
+}
+
+void TileMap::RenderLayer(int layer) {
+    for (int x = 0; x < mapWidth; x++) {
+        for (int y = 0; y < mapHeight; y++) {
+            
+            float posX = x * tileSet->GetTileWidth();
+            float posY = y * tileSet->GetTileHeight();
+            
+            posX += associated.box.x;
+            posY += associated.box.y;
+            
+            int tileIndex = At(x, y, layer);
+            
+            if (tileIndex > -1) {
+                tileSet->RenderTile(tileIndex, posX, posY);
+            }
+        }
+    }
+}
+
+void TileMap::Render() {
+    for (int z = 0; z < mapDepth; z++) {
+        RenderLayer(z);
+    }
+}
+
+void TileMap::Update(float dt) {
+    //implementar depois
+}
+
+int TileMap::GetWidth() { return mapWidth; }
+int TileMap::GetHeight() { return mapHeight; }
+int TileMap::GetDepth() { return mapDepth; }
+#include "TileSet.h"
+
+TileSet::TileSet(int tileWidth, int tileHeight, std::string file)
+    : tileWidth(tileWidth), tileHeight(tileHeight), tileSet(file){
+
+    if(tileSet.IsOpen()){
+        columns = tileSet.GetWidth() / tileWidth;
+        rows = tileSet.GetHeight() / tileHeight;
+    } else{
+        columns = 0;
+        rows = 0;
+    }
+}
+
+void TileSet::RenderTile(unsigned index, float x, float y){
+    unsigned maxTiles = rows * columns;
+    if(index < maxTiles){
+        int tileColumn = index % columns;
+        int tileRow = index / columns;
+
+        int clipX = tileColumn * tileWidth;
+        int clipY = tileRow * tileHeight;
+
+        tileSet.SetClip(clipX, clipY, tileWidth, tileHeight);
+        tileSet.Render(x, y, tileWidth, tileHeight);
+    }
+}
+
+int TileSet::GetTileWidth(){
+    return tileWidth;
+}
+
+int TileSet::GetTileHeight(){
+    return tileHeight;
+}
+#include "Timer.h"
+
+Timer::Timer() : elapsed(0.0f) {}
+
+void Timer::Update(float dt) {
+    elapsed += dt;
+}
+
+void Timer::Restart() {
+    elapsed = 0.0f;
+}
+
+float Timer::Get() const {
+    return elapsed;
+}
+#include "Vec2.h"
+#include <cmath>
+
+Vec2::Vec2() : x(0), y(0) {}
+Vec2::Vec2(float x, float y) : x(x), y(y) {}
+
+//rotação baseada na matriz de rotação especificada no PDF
+Vec2 Vec2::GetRotated(float angle) const{
+    float x_prime = x * std::cos(angle) - y * std::sin(angle);
+    float y_prime = y * std::cos(angle) + x * std::sin(angle);
+    return Vec2(x_prime, y_prime);
+}
+
+Vec2 Vec2::operator+(const Vec2& rhs) const { return Vec2(x + rhs.x, y + rhs.y); }
+Vec2 Vec2::operator-(const Vec2& rhs) const { return Vec2(x - rhs.x, y - rhs.y); }
+Vec2 Vec2::operator*(const float rhs) const { return Vec2(x * rhs, y * rhs); }
+
+float Vec2::Magnitude() const { return std::sqrt(x * x + y * y); }
+
+Vec2 Vec2::GetNormalized() const{
+    float mag = Magnitude();
+    if (mag == 0) return Vec2(0, 0); //prevenção de divisão por zero
+    return Vec2(x / mag, y / mag);
+}
+
+float Vec2::Distance(const Vec2& dst) const { return (*this - dst).Magnitude(); }
+
+float Vec2::Inclination() const { return std::atan2(y, x); }
+
+float Vec2::Inclination(const Vec2& dst) const { return (dst - *this).Inclination(); }
+#include "Zombie.h"
+#include "GameObject.h"
+#include "SpriteRenderer.h"
+#include "Animator.h"
+#include "Animation.h"
+
+Zombie::Zombie(GameObject& associated) : Component(associated), hitpoints(100) {
+    SpriteRenderer* sprite = new SpriteRenderer(associated, "assets/img/Enemy.png", 3, 2);
+    associated.AddComponent(sprite);
+
+    Animator* animator = new Animator(associated);
+    animator->AddAnimation("walking", Animation(0, 3, 10.0f));
+    animator->AddAnimation("dead", Animation(5, 5, 0.0f));
+    
+    associated.AddComponent(animator);
+    animator->SetAnimation("walking");
+
+    deathSound.Open("assets/audio/Dead.wav");
+}
+
+void Zombie::Damage(int damage) {
+    hitpoints -= damage;
+
+    if(isDead){
+        return;
+    }
+    
+    if (hitpoints <= 0) {
+        isDead = true;
+        Animator* animator = associated.GetComponent<Animator>();
+        if (animator != nullptr) {
+            animator->SetAnimation("dead");
+        }
+
+        deathSound.Play(1);
+    }
+}
+
+void Zombie::Update(float dt) {
+    //mudar depois
+    Damage(1);
+}
+
+void Zombie::Render() {
+}
+#pragma once
+#include <SDL3/SDL.h>
+
+class Animation {
+public:
+    int frameStart;
+    int frameEnd;
+    float frameTime;
+    SDL_FlipMode flip;
+
+    Animation(int frameStart = 0, int frameEnd = 0, float frameTime = 0.0f) 
+        : frameStart(frameStart), frameEnd(frameEnd), frameTime(frameTime), flip(SDL_FLIP_NONE) {}
+};
+#pragma once
+#include "Component.h"
+#include "Animation.h"
+#include <string>
+#include <unordered_map>
+
+class Animator : public Component {
+private:
+    std::unordered_map<std::string, Animation> animations;
+    std::string currentAnimationName;
+    int frameStart;
+    int frameEnd;
+    float frameTime;
+    int currentFrame;
+    float timeElapsed;
+
+public:
+    Animator(GameObject& associated);
+
+    void Update(float dt) override;
+    void Render() override;
+    
+    void SetAnimation(std::string name);
+    void AddAnimation(std::string name, Animation anim);
+};
+#pragma once
+#include "Component.h"
+#include "Vec2.h"
+
+class Bullet : public Component {
+private:
+    Vec2 speed;
+    float distanceLeft;
+    int damage;
+
+public:
+    Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance);
+    void Update(float dt) override;
+    void Render() override;
+    int GetDamage();
+};
+#pragma once
+#include "Vec2.h"
+#include "GameObject.h"
+
+class Camera {
+public:
+    static Vec2 pos;
+    static Vec2 speed;
+    static GameObject* focus;
+
+    static void Follow(GameObject* newFocus);
+    static void Unfollow();
+    static void Update(float dt);
+};
+#pragma once
+#include "Component.h"
+#include "Command.h"
+#include "Timer.h"
+#include <queue>
+#include <memory>
+#include <string>
+
+class Character : public Component {
+private:
+    std::weak_ptr<GameObject> gun;
+    std::queue<Command> taskQueue;
+    Vec2 speed;
+    float linearSpeed;
+    int hp;
+    Timer deathTimer;
+
+public:
+    static Character* player;
+
+    Character(GameObject& associated, std::string sprite);
+    ~Character();
+    void Start() override;
+    void Update(float dt) override;
+    void Render() override;
+    void Issue(Command task);
+};
+#pragma once
+#include "Vec2.h"
+
+class Command {
+public:
+    enum CommandType { MOVE, SHOOT };
+
+    CommandType type;
+    Vec2 pos;
+
+    Command(CommandType type, float x, float y);
+};
+#pragma once
+
+//forward declaration para evitar inclusão circular
+class GameObject;
+
+class Component {
+protected:
+    GameObject& associated;
+
+public:
+    //recebe a referência e a iniciasliza na lista
+    Component(GameObject& associated) : associated(associated) {}
+    
+    //obs: perguntar se pode usar destructor virtual
+    virtual ~Component() = default; 
+
+    virtual void Update(float dt) = 0;
+    virtual void Render() = 0;
+    virtual void Start() {}
+};
+#pragma once
+#include <SDL3/SDL.h>
+#include <SDL3_mixer/SDL_mixer.h>
+#include <string>
+#include "State.h"
+
+class Game {
+    private:
+        //Atributos
+        static Game* instance;
+
+        SDL_Window* window;
+        SDL_Renderer* renderer;
+        State* state;
+
+        MIX_Mixer* mixer;
+
+        float dt;
+        Uint64 frameStart; // Em SDL3, SDL_GetTicks retorna Uint64
+        void CalculateDeltaTime();
+
+        //Construtor
+        Game(std::string title, int width, int height);
+
+    public:
+        //Destructor
+        ~Game();
+
+        //Metodos
+        void Run();
+        SDL_Renderer* GetRenderer();
+        State& GetState();
+        MIX_Mixer* GetMixer();
+
+        float GetDeltaTime();
+
+        static Game& GetInstance();
+};
+#pragma once
+#include <vector>
+#include <string>
+#include <memory>
+#include "Component.h"
+#include "Rect.h"
+
+class GameObject {
+private:
+    std::vector<Component*> components;
+    bool isDead;
+    bool started;
+    double angleDeg;
+
+public:
+    Rect box;
+
+    GameObject();
+    ~GameObject();
+
+    void Update(float dt);
+    void Render();
+    bool IsDead();
+    void RequestDelete();
+    void AddComponent(Component* cpt);
+    void RemoveComponent(Component* cpt);
+    void Start();
+
+    double GetAngleDeg() const { return angleDeg; }
+
+    //implementação do template para retornar o tipo certo
+    template<typename T>
+    T* GetComponent() {
+        for (int i = 0; i < components.size(); i++) {
+            T* component = dynamic_cast<T*>(components[i]);
+            if (component != nullptr) {
+                return component;
+            }
+        }
+        return nullptr;
+    }
+};
+#pragma once
+#include "Component.h"
+#include "Timer.h"
+#include "Sound.h"
+#include "Vec2.h"
+#include <memory>
+
+class Gun : public Component {
+private:
+    Sound shotSound;
+    Sound reloadSound;
+    int cooldownState;
+    Timer cdTimer;
+    std::weak_ptr<GameObject> character;
+    float angle;
+
+public:
+    Gun(GameObject& associated, std::weak_ptr<GameObject> character);
+    void Update(float dt) override;
+    void Render() override;
+    void Shoot(Vec2 target);
+};
+#pragma once
+#include <SDL3/SDL.h>
+#include <unordered_map>
+
+#define LEFT_ARROW_KEY    SDLK_LEFT
+#define RIGHT_ARROW_KEY   SDLK_RIGHT
+#define UP_ARROW_KEY      SDLK_UP
+#define DOWN_ARROW_KEY    SDLK_DOWN
+#define ESCAPE_KEY        SDLK_ESCAPE
+#define SPACE_KEY         SDLK_SPACE
+#define LEFT_MOUSE_BUTTON SDL_BUTTON_LEFT
+#define RIGHT_MOUSE_BUTTON SDL_BUTTON_RIGHT
+
+class InputManager {
+private:
+    std::unordered_map<int, bool> keyState;
+    std::unordered_map<int, int> keyUpdate;
+
+    bool mouseState[6];
+    int mouseUpdate[6];
+
+    bool quitRequested;
+    int updateCounter;
+
+    int mouseX;
+    int mouseY;
+
+    InputManager();
+    ~InputManager();
+
+public:
+    static InputManager& GetInstance(); // padrao singleton
+
+    void Update();
+
+    bool KeyPress(int key);
+    bool KeyRelease(int key);
+    bool IsKeyDown(int key);
+
+    bool MousePress(int button);
+    bool MouseRelease(int button);
+    bool IsMouseDown(int button);
+
+    int GetMouseX();
+    int GetMouseY();
+
+    bool QuitRequested();
+};
+#pragma once
+#include <string>
+#include <SDL3_mixer/SDL_mixer.h>
+
+class Music{
+    private:
+        MIX_Audio* audio;
+        MIX_Track* track;
+
+    public:
+        Music();
+        Music(std::string file);
+        ~Music();
+
+        void Play(int times = -1);
+        void Stop(int msToStop = 1500);
+        void Open(std::string file);
+        bool IsOpen();
+};
+#pragma once
+#include "Component.h"
+#include <memory>
+
+class PlayerController : public Component {
+private:
+    std::weak_ptr<GameObject> character;
+
+public:
+    PlayerController(GameObject& associated);
+    void Update(float dt) override;
+    void Render() override;
+    void SetCharacter(std::weak_ptr<GameObject> newCharacter);
+};
+#pragma once
+#include "Vec2.h"
+
+class Rect{
+public:
+    float x, y, w, h;
+
+    Rect();
+    Rect(float x, float y, float w, float h);
+
+    Vec2 Center() const;
+    float Distance(const Rect& dst) const;
+    bool Contains(float pX, float pY) const;
+    bool Contains(const Vec2& p) const;
+    
+    Rect operator+(const Vec2& rhs) const;
+};
+#pragma once
+#include <string>
+#include <unordered_map>
+#include <SDL3/SDL.h>
+#include <SDL3_mixer/SDL_mixer.h>
+
+class Resources {
+private:
+    static std::unordered_map<std::string, SDL_Texture*> imageTable;
+    static std::unordered_map<std::string, MIX_Audio*> audioTable;
+
+public:
+    static SDL_Texture* GetImage(std::string file);
+    static void ClearImages();
+
+    static MIX_Audio* GetAudio(std::string file);
+    static void ClearAudios();
+
+    static void ClearAll();
+};
+#pragma once
+#include <string>
+#include <SDL3_mixer/SDL_mixer.h>
+
+class Sound {
+private:
+    MIX_Audio* audio;
+    MIX_Track* track;
+
+public:
+    Sound();
+    Sound(std::string file);
+    ~Sound();
+
+    void Play(int times = 1);
+    void Stop();
+    void Open(std::string file);
+    bool IsOpen();
+};
+#pragma once
+#include <string>
+#include <SDL3/SDL.h>
+#include "Vec2.h"
+
+class Sprite{
+    private:
+        SDL_Texture* texture;
+        float width;
+        float height;
+        SDL_FRect clipRect;
+
+        int frameCountW;
+        int frameCountH;
+
+        Vec2 scale; 
+        SDL_FlipMode flip;
+
+        bool cameraFollower;
+
+    public:
+        Sprite();
+        Sprite(std::string file, int frameCountW = 1, int frameCountH = 1);
+        ~Sprite();
+
+        void Open(std::string file);
+        void SetClip(int x, int y, int w, int h);
+        void Render(float x, float y, float w, float h, double angle = 0);
+
+        float GetWidth();
+        float GetHeight();
+        bool IsOpen();
+
+        void SetFrame(int frame);
+        void SetFrameCount(int frameCountW, int frameCountH);
+
+        void SetScale(float scaleX, float scaleY);
+        Vec2 GetScale();
+        void SetFlip(SDL_FlipMode flip);
+
+        void SetCameraFollower(bool follow);
+
+};
+#pragma once
+#include "Component.h"
+#include "Sprite.h"
+#include <string>
+
+class SpriteRenderer : public Component {
+private:
+    Sprite sprite;
+
+public:
+    SpriteRenderer(GameObject& associated);
+    SpriteRenderer(GameObject& associated, std::string file, int frameCountW = 1, int frameCountH = 1);
+    
+    void Open(std::string file);
+    void SetFrameCount(int frameCountW, int frameCountH);
+    void SetFrame(int frame, SDL_FlipMode flip = SDL_FLIP_NONE);
+    
+    //overide dos métodos abstratos
+    void Update(float dt) override;
+    void Render() override;
+    void SetCameraFollower(bool follow);
+    void SetScale(float scaleX, float scaleY);
+};
+#pragma once
+#include <vector>
+#include <memory>
+#include "Sprite.h"
+#include "Music.h"
+#include "GameObject.h"
+
+class State {
+    private:
+        //substituir o background antigo
+        std::vector<std::shared_ptr<GameObject>> objectArray;
+        Music music;
+        bool quitRequested;
+        bool started;
+
+    public:
+        //Construtor
+        State();
+        ~State();
+
+        //Metodos
+        bool QuitRequested();
+        void LoadAssets();
+        void Start();
+        void Update(float dt);
+        void Render();
+        std::weak_ptr<GameObject>AddObject(GameObject* go);
+        std::weak_ptr<GameObject> GetObjectPtr(GameObject* go);
+};
+#pragma once
+#include "Component.h"
+#include "TileSet.h"
+#include <string>
+#include <vector>
+#include <memory>
+
+class TileMap : public Component {
+private:
+    std::vector<int> tileMatrix;
+    std::unique_ptr<TileSet> tileSet;
+    int mapWidth;
+    int mapHeight;
+    int mapDepth;
+
+public:
+    TileMap(GameObject& associated, std::string file, TileSet* tileSet);
+    
+    void Load(std::string file);
+    void SetTileSet(TileSet* tileSet);
+    int& At(int x, int y, int z = 0);
+    
+    void Render() override;
+    void RenderLayer(int layer);
+    void Update(float dt) override; //precisa pq herdou
+    
+    int GetWidth();
+    int GetHeight();
+    int GetDepth();
+};
+#pragma once
+#include <string>
+#include "Sprite.h"
+
+class TileSet {
+    private:
+        Sprite tileSet;
+        int tileWidth;
+        int tileHeight;
+        int tileCount;
+
+        int rows;
+        int columns;
+
+    public:
+        TileSet(int tileWidth, int tileHeight, std::string file);
+        void RenderTile(unsigned index, float x, float y);
+        int GetTileWidth();
+        int GetTileHeight();
+};
+#pragma once
+
+class Timer {
+private:
+    float elapsed;
+
+public:
+    Timer();
+    void Update(float dt);
+    void Restart();
+    float Get() const;
+};
+#pragma once
+
+class Vec2{
+public:
+    float x;
+    float y;
+
+    Vec2();
+    Vec2(float x, float y);
+
+    Vec2 GetRotated(float angle) const;
+    Vec2 operator+(const Vec2& rhs) const;
+    Vec2 operator-(const Vec2& rhs) const;
+    Vec2 operator*(const float rhs) const;
+    
+    float Magnitude() const;
+    Vec2 GetNormalized() const;
+    float Distance(const Vec2& dst) const;
+    float Inclination() const;
+    float Inclination(const Vec2& dst) const;
+};
+#pragma once
+#include "Component.h"
+#include "Sound.h"
+
+class Zombie : public Component {
+private:
+    int hitpoints;
+    bool isDead = false;
+    Sound deathSound;
+
+public:
+    Zombie(GameObject& associated);
+    
+    
+    void Damage(int damage);
+    void Update(float dt) override;
+    void Render() override;
+};
