@@ -9,18 +9,21 @@
 Character* Character::player = nullptr;
 
 Character::Character(GameObject& associated, std::string sprite)
-    : Component(associated), speed(0, 0), linearSpeed(200.0f), hp(100) {
+    : Component(associated), speed(0, 0), linearSpeed(200.0f), hp(100), facingLeft(false) {
     // sprite do personagem
     SpriteRenderer* renderer = new SpriteRenderer(associated, sprite, 3, 4);
     associated.AddComponent(renderer);
 
+
     // animações
     Animator* animator = new Animator(associated);
-    animator->AddAnimation("idle", Animation(0, 0, 0.0f));
-    animator->AddAnimation("walking", Animation(0, 3, 0.1f));
-    animator->AddAnimation("dead", Animation(0, 0, 0.0f));
+    animator->AddAnimation("idle_right", Animation(0, 0, 0.0f, SDL_FLIP_NONE));
+    animator->AddAnimation("idle_left", Animation(0, 0, 0.0f, SDL_FLIP_HORIZONTAL));
+    animator->AddAnimation("walking_right", Animation(0, 3, 0.1f, SDL_FLIP_NONE));
+    animator->AddAnimation("walking_left", Animation(0, 3, 0.1f, SDL_FLIP_HORIZONTAL));
+    animator->AddAnimation("dead", Animation(0, 0, 0.0f, SDL_FLIP_NONE));
     associated.AddComponent(animator);
-    animator->SetAnimation("idle");
+    animator->SetAnimation("idle_right");
 
     // registra instância global do jogador
     player = this;
@@ -61,13 +64,15 @@ void Character::Update(float dt) {
         Command cmd = taskQueue.front();
         taskQueue.pop();
 
+        std::string suffix = facingLeft ? "_left" : "_right";
+
         if (cmd.type == Command::MOVE) {
             speed = cmd.pos.GetNormalized() * linearSpeed;
 
             // orienta animação de movimento
             Animator* animator = associated.GetComponent<Animator>();
             if (animator) {
-                animator->SetAnimation("walking");
+                animator->SetAnimation("walking" + suffix);
             }
         } else if (cmd.type == Command::SHOOT) {
             auto gunObj = gun.lock();
@@ -80,7 +85,7 @@ void Character::Update(float dt) {
 
             Animator* animator = associated.GetComponent<Animator>();
             if (animator) {
-                animator->SetAnimation("idle");
+                animator->SetAnimation("idle" + suffix);
             }
         }
     }
@@ -93,11 +98,20 @@ void Character::Update(float dt) {
     speed.x *= 0.90f;
     speed.y *= 0.90f;
 
-    // se parou, volta para idle
-    if (speed.Magnitude() < 1.0f) {
-        Animator* animator = associated.GetComponent<Animator>();
-        if (animator) {
-            animator->SetAnimation("idle");
+    if (speed.x < -0.1f) {
+        facingLeft = true;
+    } else if (speed.x > 0.1f) {
+        facingLeft = false;
+    }
+
+    std::string suffix = facingLeft ? "_left" : "_right";
+
+    Animator* animator = associated.GetComponent<Animator>();
+    if (animator) {
+        if (speed.Magnitude() >= 1.0f) {
+            animator->SetAnimation("walking" + suffix);
+        } else {
+            animator->SetAnimation("idle" + suffix);
         }
     }
 }

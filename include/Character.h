@@ -14,6 +14,7 @@ private:
     float linearSpeed;
     int hp;
     Timer deathTimer;
+    bool facingLeft;
 
 public:
     static Character* player;
