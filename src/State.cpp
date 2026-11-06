@@ -99,7 +99,7 @@ void State::Update(float dt){
 
     Camera::Update(dt);
 
-    if(input.KeyPress(SPACE_KEY)){
+    if(input.KeyPress(SDLK_TAB)){
         GameObject* zombieObj = new GameObject();
         
         zombieObj->box.x = input.GetMouseX() + Camera::pos.x - (zombieObj->box.w / 2.0f);

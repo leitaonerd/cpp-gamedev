@@ -37,13 +37,15 @@ Character::~Character() {
 }
 
 void Character::Start() {
-    // cria a arma como objeto separado no State
+    std::weak_ptr<GameObject> charWeak = Game::GetInstance().GetState().GetObjectPtr(&associated);
+
+    //cria a arma passando a referência válida do Character
     GameObject* gunObj = new GameObject();
-    Gun* gunComp = new Gun(*gunObj, std::weak_ptr<GameObject>());
+    Gun* gunComp = new Gun(*gunObj, charWeak);
     gunObj->AddComponent(gunComp);
     Game::GetInstance().GetState().AddObject(gunObj);
 
-    // guarda referência fraca para a arma
+    //guarda a referência fraca da arma
     std::weak_ptr<GameObject> gunWeak = Game::GetInstance().GetState().GetObjectPtr(gunObj);
     gun = gunWeak;
 }

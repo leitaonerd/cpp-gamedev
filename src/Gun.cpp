@@ -4,11 +4,12 @@
 #include "SpriteRenderer.h"
 #include "Game.h"
 #include <cmath>
+#include <iostream>
 
 Gun::Gun(GameObject& associated, std::weak_ptr<GameObject> character)
     : Component(associated), character(character), cooldownState(0), angle(0.0f) {
     // sprite da arma
-    SpriteRenderer* renderer = new SpriteRenderer(associated, "assets/img/Gun.png");
+    SpriteRenderer* renderer = new SpriteRenderer(associated, "assets/img/Gun.png", 3, 2);
     associated.AddComponent(renderer);
 
     shotSound.Open("assets/audio/BGM.wav");
@@ -37,14 +38,14 @@ void Gun::Update(float dt) {
     // máquina de estados de cooldown (0 a 3)
     if (cooldownState == 1) {
         // disparo efetuado, entrando em recarga
-        if (cdTimer.Get() >= 0.2f) {
+        if (cdTimer.Get() >= 0.1f) {
             cooldownState = 2;
             cdTimer.Restart();
             reloadSound.Play(1);
         }
     } else if (cooldownState == 2) {
         // animação de recarga (pump-action)
-        if (cdTimer.Get() >= 0.5f) {
+        if (cdTimer.Get() >= 0.3f) {
             cooldownState = 3;
             cdTimer.Restart();
         }
@@ -60,6 +61,8 @@ void Gun::Shoot(Vec2 target) {
     if (cooldownState != 0) {
         return;
     }
+
+    std::cout << "Atirou! A bala foi criada." << std::endl;
 
     // calcula ângulo para o alvo
     Vec2 pos = associated.box.Center();
