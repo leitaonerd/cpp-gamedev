@@ -1,6 +1,7 @@
 #include "Bullet.h"
 #include "GameObject.h"
 #include "SpriteRenderer.h"
+#include "Collider.h"
 #include <cmath>
 
 Bullet::Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance)
@@ -15,6 +16,8 @@ Bullet::Bullet(GameObject& associated, float angle, float speed, int damage, flo
 
     associated.box.w = 8;
     associated.box.h = 8;
+
+    associated.AddComponent(new Collider(associated));
 }
 
 void Bullet::Update(float dt) {

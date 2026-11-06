@@ -5,6 +5,7 @@
 #include "Animator.h"
 #include "Animation.h"
 #include "Game.h"
+#include "Collider.h"
 
 Character* Character::player = nullptr;
 
@@ -24,6 +25,8 @@ Character::Character(GameObject& associated, std::string sprite)
     animator->AddAnimation("dead", Animation(0, 0, 0.0f, SDL_FLIP_NONE));
     associated.AddComponent(animator);
     animator->SetAnimation("idle_right");
+
+    associated.AddComponent(new Collider(associated));
 
     // registra instância global do jogador
     player = this;

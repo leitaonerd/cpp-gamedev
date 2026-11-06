@@ -1,3 +1,4 @@
+#define DEBUG
 #include "Collider.h"
 #include "Camera.h"
 #include "Game.h"

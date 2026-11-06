@@ -3,6 +3,7 @@
 #include "SpriteRenderer.h"
 #include "Animator.h"
 #include "Animation.h"
+#include "Collider.h"
 
 Zombie::Zombie(GameObject& associated) : Component(associated), hitpoints(100) {
     SpriteRenderer* sprite = new SpriteRenderer(associated, "assets/img/Enemy.png", 3, 2);
@@ -14,6 +15,8 @@ Zombie::Zombie(GameObject& associated) : Component(associated), hitpoints(100) {
     
     associated.AddComponent(animator);
     animator->SetAnimation("walking");
+
+    associated.AddComponent(new Collider(associated));
 
     deathSound.Open("assets/audio/Dead.wav");
 }
