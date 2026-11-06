@@ -27,7 +27,7 @@ void Animator::Update(float dt) {
         //atualiza o frame no SpriteRenderer do mesmo objeto
         SpriteRenderer* sprite = associated.GetComponent<SpriteRenderer>();
         if (sprite != nullptr) {
-            sprite->SetFrame(currentFrame);
+            sprite->SetFrame(currentFrame, animations[currentAnimationName].flip);
         }
     }
 }
@@ -54,7 +54,7 @@ void Animator::SetAnimation(std::string name) {
         //chama SetFrame no SpriteRenderer
         SpriteRenderer* sprite = associated.GetComponent<SpriteRenderer>();
         if (sprite != nullptr) {
-            sprite->SetFrame(currentFrame);
+            sprite->SetFrame(currentFrame, it->second.flip);
         }
     }
 }
@@ -154,18 +154,21 @@ void Camera::Update(float dt){
 Character* Character::player = nullptr;
 
 Character::Character(GameObject& associated, std::string sprite)
-    : Component(associated), speed(0, 0), linearSpeed(200.0f), hp(100) {
+    : Component(associated), speed(0, 0), linearSpeed(200.0f), hp(100), facingLeft(false) {
     // sprite do personagem
-    SpriteRenderer* renderer = new SpriteRenderer(associated, sprite, 1, 4);
+    SpriteRenderer* renderer = new SpriteRenderer(associated, sprite, 3, 4);
     associated.AddComponent(renderer);
+
 
     // animações
     Animator* animator = new Animator(associated);
-    animator->AddAnimation("idle", Animation(0, 0, 0.0f));
-    animator->AddAnimation("walking", Animation(0, 3, 0.1f));
-    animator->AddAnimation("dead", Animation(0, 0, 0.0f));
+    animator->AddAnimation("idle_right", Animation(0, 0, 0.0f, SDL_FLIP_NONE));
+    animator->AddAnimation("idle_left", Animation(0, 0, 0.0f, SDL_FLIP_HORIZONTAL));
+    animator->AddAnimation("walking_right", Animation(0, 3, 0.1f, SDL_FLIP_NONE));
+    animator->AddAnimation("walking_left", Animation(0, 3, 0.1f, SDL_FLIP_HORIZONTAL));
+    animator->AddAnimation("dead", Animation(0, 0, 0.0f, SDL_FLIP_NONE));
     associated.AddComponent(animator);
-    animator->SetAnimation("idle");
+    animator->SetAnimation("idle_right");
 
     // registra instância global do jogador
     player = this;
@@ -202,9 +205,11 @@ void Character::Update(float dt) {
     }
 
     // consome fila de comandos
-    if (!taskQueue.empty()) {
+    while (!taskQueue.empty()) {
         Command cmd = taskQueue.front();
         taskQueue.pop();
+
+        std::string suffix = facingLeft ? "_left" : "_right";
 
         if (cmd.type == Command::MOVE) {
             speed = cmd.pos.GetNormalized() * linearSpeed;
@@ -212,7 +217,7 @@ void Character::Update(float dt) {
             // orienta animação de movimento
             Animator* animator = associated.GetComponent<Animator>();
             if (animator) {
-                animator->SetAnimation("walking");
+                animator->SetAnimation("walking" + suffix);
             }
         } else if (cmd.type == Command::SHOOT) {
             auto gunObj = gun.lock();
@@ -225,7 +230,7 @@ void Character::Update(float dt) {
 
             Animator* animator = associated.GetComponent<Animator>();
             if (animator) {
-                animator->SetAnimation("idle");
+                animator->SetAnimation("idle" + suffix);
             }
         }
     }
@@ -238,11 +243,20 @@ void Character::Update(float dt) {
     speed.x *= 0.90f;
     speed.y *= 0.90f;
 
-    // se parou, volta para idle
-    if (speed.Magnitude() < 1.0f) {
-        Animator* animator = associated.GetComponent<Animator>();
-        if (animator) {
-            animator->SetAnimation("idle");
+    if (speed.x < -0.1f) {
+        facingLeft = true;
+    } else if (speed.x > 0.1f) {
+        facingLeft = false;
+    }
+
+    std::string suffix = facingLeft ? "_left" : "_right";
+
+    Animator* animator = associated.GetComponent<Animator>();
+    if (animator) {
+        if (speed.Magnitude() >= 1.0f) {
+            animator->SetAnimation("walking" + suffix);
+        } else {
+            animator->SetAnimation("idle" + suffix);
         }
     }
 }
@@ -657,11 +671,9 @@ bool Music::IsOpen() {
 PlayerController::PlayerController(GameObject& associated) : Component(associated) {}
 
 void PlayerController::Update(float dt) {
-    auto charObj = character.lock();
-    if (!charObj) return;
 
-    Character* characterComp = charObj->GetComponent<Character>();
-    if (!characterComp) return;
+    Character* characterComp = associated.GetComponent<Character>();
+    if (characterComp == nullptr) return;
 
     InputManager& input = InputManager::GetInstance();
 
@@ -1043,15 +1055,11 @@ State::State() : started (false), quitRequested(false){
     playerObj->box.w = 32;
     playerObj->box.h = 32;
 
-    SpriteRenderer* playerRenderer = new SpriteRenderer(*playerObj, "assets/img/Player.png", 4, 1);
-    playerObj->AddComponent(playerRenderer);
-
     Character* character = new Character(*playerObj, "assets/img/Player.png");
     playerObj->AddComponent(character);
 
     PlayerController* playerController = new PlayerController(*playerObj);
     playerObj->AddComponent(playerController);
-    playerController->SetCharacter(std::weak_ptr<GameObject>());
 
     AddObject(playerObj);
 
@@ -1356,8 +1364,8 @@ public:
     float frameTime;
     SDL_FlipMode flip;
 
-    Animation(int frameStart = 0, int frameEnd = 0, float frameTime = 0.0f) 
-        : frameStart(frameStart), frameEnd(frameEnd), frameTime(frameTime), flip(SDL_FLIP_NONE) {}
+    Animation(int frameStart = 0, int frameEnd = 0, float frameTime = 0.0f, SDL_FlipMode flip = SDL_FLIP_NONE)
+        : frameStart(frameStart), frameEnd(frameEnd), frameTime(frameTime), flip(flip) {}
 };
 #pragma once
 #include "Component.h"
@@ -1430,6 +1438,7 @@ private:
     float linearSpeed;
     int hp;
     Timer deathTimer;
+    bool facingLeft;
 
 public:
     static Character* player;

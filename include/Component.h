@@ -13,6 +13,7 @@ public:
     
     //obs: perguntar se pode usar destructor virtual
     virtual ~Component() = default; 
+    virtual void NotifyCollision(GameObject& other) {}
 
     virtual void Update(float dt) = 0;
     virtual void Render() = 0;

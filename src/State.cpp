@@ -8,6 +8,8 @@
 #include "Character.h"
 #include "Gun.h"
 #include "PlayerController.h"
+#include "Collider.h"
+#include "Collision.h"
 #include <SDL3/SDL.h>
 
 State::State() : started (false), quitRequested(false){
@@ -112,6 +114,26 @@ void State::Update(float dt){
 
     for(int i = 0; i < objectArray.size(); i++){
         objectArray[i]->Update(dt);
+    }
+
+    for (int i = 0; i < objectArray.size(); i++) {
+        Collider* colliderA = objectArray[i]->GetComponent<Collider>();
+        if (!colliderA) continue;
+
+        // j = i + 1 garante que cada par (A,B) é testado apenas uma vez e previne testar (A,A)
+        for (int j = i + 1; j < objectArray.size(); j++) {
+            Collider* colliderB = objectArray[j]->GetComponent<Collider>();
+            if (!colliderB) continue;
+
+            //converte pra radiano
+            float angleRadA = objectArray[i]->GetAngleDeg() * (3.14159265359f / 180.0f);
+            float angleRadB = objectArray[j]->GetAngleDeg() * (3.14159265359f / 180.0f);
+
+            if (Collision::IsColliding(colliderA->box, colliderB->box, angleRadA, angleRadB)) {
+                objectArray[i]->NotifyCollision(*objectArray[j]);
+                objectArray[j]->NotifyCollision(*objectArray[i]);
+            }
+        }
     }
 
     for(int i = 0; i < objectArray.size(); i++){
