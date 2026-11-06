@@ -68,6 +68,7 @@ void Animator::AddAnimation(std::string name, Animation anim) {
 #include "Bullet.h"
 #include "GameObject.h"
 #include "SpriteRenderer.h"
+#include "Collider.h"
 #include <cmath>
 
 Bullet::Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance)
@@ -82,6 +83,8 @@ Bullet::Bullet(GameObject& associated, float angle, float speed, int damage, flo
 
     associated.box.w = 8;
     associated.box.h = 8;
+
+    associated.AddComponent(new Collider(associated));
 }
 
 void Bullet::Update(float dt) {
@@ -150,6 +153,7 @@ void Camera::Update(float dt){
 #include "Animator.h"
 #include "Animation.h"
 #include "Game.h"
+#include "Collider.h"
 
 Character* Character::player = nullptr;
 
@@ -170,6 +174,8 @@ Character::Character(GameObject& associated, std::string sprite)
     associated.AddComponent(animator);
     animator->SetAnimation("idle_right");
 
+    associated.AddComponent(new Collider(associated));
+
     // registra instância global do jogador
     player = this;
 }
@@ -179,13 +185,15 @@ Character::~Character() {
 }
 
 void Character::Start() {
-    // cria a arma como objeto separado no State
+    std::weak_ptr<GameObject> charWeak = Game::GetInstance().GetState().GetObjectPtr(&associated);
+
+    //cria a arma passando a referência válida do Character
     GameObject* gunObj = new GameObject();
-    Gun* gunComp = new Gun(*gunObj, std::weak_ptr<GameObject>());
+    Gun* gunComp = new Gun(*gunObj, charWeak);
     gunObj->AddComponent(gunComp);
     Game::GetInstance().GetState().AddObject(gunObj);
 
-    // guarda referência fraca para a arma
+    //guarda a referência fraca da arma
     std::weak_ptr<GameObject> gunWeak = Game::GetInstance().GetState().GetObjectPtr(gunObj);
     gun = gunWeak;
 }
@@ -266,6 +274,56 @@ void Character::Render() {}
 void Character::Issue(Command task) {
     taskQueue.push(task);
 }
+#define DEBUG
+#include "Collider.h"
+#include "Camera.h"
+#include "Game.h"
+#include <SDL3/SDL.h>
+#include <cmath>
+
+Collider::Collider(GameObject& associated, Vec2 scale, Vec2 offset) 
+    : Component(associated), scale(scale), offset(offset) {}
+
+void Collider::Update(float dt) {
+    // A box do collider assume as dimensões do objeto modificadas pela escala da colisão
+    box.w = associated.box.w * scale.x;
+    box.h = associated.box.h * scale.y;
+
+    // Atualiza o centro aplicando o offset rotacionado
+    Vec2 center = associated.box.Center();
+    float angleRad = associated.GetAngleDeg() * (3.14159265359f / 180.0f);
+    Vec2 rotatedOffset = offset.GetRotated(angleRad);
+    
+    box.x = center.x + rotatedOffset.x - (box.w / 2.0f);
+    box.y = center.y + rotatedOffset.y - (box.h / 2.0f);
+}
+
+void Collider::Render() {
+#ifdef DEBUG
+    Vec2 center(box.Center());
+    SDL_FPoint points[5];
+    float angleRad = associated.GetAngleDeg() * (3.14159265359f / 180.0f);
+
+    Vec2 point = (Vec2(box.x, box.y) - center).GetRotated(angleRad) + center - Camera::pos;
+    points[0] = {point.x, point.y};
+    points[4] = {point.x, point.y};
+    
+    point = (Vec2(box.x + box.w, box.y) - center).GetRotated(angleRad) + center - Camera::pos;
+    points[1] = {point.x, point.y};
+    
+    point = (Vec2(box.x + box.w, box.y + box.h) - center).GetRotated(angleRad) + center - Camera::pos;
+    points[2] = {point.x, point.y};
+    
+    point = (Vec2(box.x, box.y + box.h) - center).GetRotated(angleRad) + center - Camera::pos;
+    points[3] = {point.x, point.y};
+
+    SDL_SetRenderDrawColor(Game::GetInstance().GetRenderer(), 255, 0, 0, 255);
+    SDL_RenderLines(Game::GetInstance().GetRenderer(), points, 5);
+#endif
+}
+
+void Collider::SetScale(Vec2 scale) { this->scale = scale; }
+void Collider::SetOffset(Vec2 offset) { this->offset = offset; }
 #include "Command.h"
 
 Command::Command(CommandType type, float x, float y)
@@ -417,17 +475,24 @@ void GameObject::RemoveComponent(Component* cpt){
         components.erase(it);
     }
 }
+
+void GameObject::NotifyCollision(GameObject& other) {
+    for (int i = 0; i < components.size(); i++) {
+        components[i]->NotifyCollision(other);
+    }
+}
 #include "Gun.h"
 #include "GameObject.h"
 #include "Bullet.h"
 #include "SpriteRenderer.h"
 #include "Game.h"
 #include <cmath>
+#include <iostream>
 
 Gun::Gun(GameObject& associated, std::weak_ptr<GameObject> character)
     : Component(associated), character(character), cooldownState(0), angle(0.0f) {
     // sprite da arma
-    SpriteRenderer* renderer = new SpriteRenderer(associated, "assets/img/Gun.png");
+    SpriteRenderer* renderer = new SpriteRenderer(associated, "assets/img/Gun.png", 3, 2);
     associated.AddComponent(renderer);
 
     shotSound.Open("assets/audio/BGM.wav");
@@ -454,22 +519,49 @@ void Gun::Update(float dt) {
     associated.box.y += std::sin(rad) * 12.0f;
 
     // máquina de estados de cooldown (0 a 3)
-    if (cooldownState == 1) {
-        // disparo efetuado, entrando em recarga
-        if (cdTimer.Get() >= 0.2f) {
+    SpriteRenderer* sprite = associated.GetComponent<SpriteRenderer>();
+    SDL_FlipMode flip = (angle > 90.0f || angle < -90.0f) ? SDL_FLIP_VERTICAL : SDL_FLIP_NONE;
+    if (sprite) {
+        sprite->SetFlip(flip); 
+    }
+    std::cout << "Gun Update - Angulo: " << angle << " | Flip calculado: " << (int)flip << std::endl;
+    associated.SetAngleDeg(angle);
+    
+    if(cooldownState == 0){
+        // estado ocioso: garante que fica no primeiro quadro
+        if (sprite) sprite->SetFrame(0);
+        
+    } else if(cooldownState == 1){
+        // disparo efetuado: anima os quadros 1 e 2 durante 0.1s
+        if(sprite){
+            int frame = 1 + static_cast<int>((cdTimer.Get() / 0.1f) * 2.0f);
+            if (frame > 2) frame = 2;
+            sprite->SetFrame(frame);
+        }
+
+        if(cdTimer.Get() >= 0.1f){
             cooldownState = 2;
             cdTimer.Restart();
             reloadSound.Play(1);
         }
-    } else if (cooldownState == 2) {
-        // animação de recarga (pump-action)
-        if (cdTimer.Get() >= 0.5f) {
+        
+    } else if(cooldownState == 2){
+        // recarga (pump-action): anima os quadros 3, 4 e 5 durante 0.3s
+        if(sprite){
+            int frame = 3 + static_cast<int>((cdTimer.Get() / 0.3f) * 3.0f);
+            if (frame > 5) frame = 5;
+            sprite->SetFrame(frame);
+        }
+
+        if(cdTimer.Get() >= 0.3f){
             cooldownState = 3;
             cdTimer.Restart();
         }
-    } else if (cooldownState == 3) {
+        
+    } else if(cooldownState == 3){
         // fim da recarga, pronto para atirar novamente
         cooldownState = 0;
+        if (sprite) sprite->SetFrame(0);
     }
 }
 
@@ -479,6 +571,8 @@ void Gun::Shoot(Vec2 target) {
     if (cooldownState != 0) {
         return;
     }
+
+    std::cout << "Atirou! A bala foi criada." << std::endl;
 
     // calcula ângulo para o alvo
     Vec2 pos = associated.box.Center();
@@ -667,6 +761,7 @@ bool Music::IsOpen() {
 #include "Character.h"
 #include "InputManager.h"
 #include "Camera.h"
+#include <iostream>
 
 PlayerController::PlayerController(GameObject& associated) : Component(associated) {}
 
@@ -687,12 +782,15 @@ void PlayerController::Update(float dt) {
         characterComp->Issue(Command(Command::MOVE, moveDir.x, moveDir.y));
     }
 
-    if (input.MousePress(LEFT_MOUSE_BUTTON)) {
+    if (input.KeyPress(SDLK_F)) {
+        std::cout << "SDLK pegou o keypress do F." << std::endl;
         Vec2 target(input.GetMouseX(), input.GetMouseY());
         target.x += Camera::pos.x;
         target.y += Camera::pos.y;
         characterComp->Issue(Command(Command::SHOOT, target.x, target.y));
     }
+
+    
 }
 
 void PlayerController::Render() {}
@@ -911,6 +1009,10 @@ void Sprite::Render(float x, float y, float w, float h, double angle){
         float renderX = x - (cameraFollower ? 0 : Camera::pos.x);
         float renderY = y - (cameraFollower ? 0 : Camera::pos.y);
 
+        if (flip == SDL_FLIP_VERTICAL) {
+            std::cout << "Renderizando com Flip Vertical! Angulo: " << angle << std::endl;
+        }
+    
         SDL_FRect dstRect = { renderX, renderY, w, h };
         SDL_RenderTextureRotated(Game::GetInstance().GetRenderer(), texture, &clipRect, &dstRect, angle, nullptr, flip);
     }
@@ -957,7 +1059,10 @@ Vec2 Sprite::GetScale() {
 }
 
 void Sprite::SetFlip(SDL_FlipMode f) {
-    flip = f;
+    if (this->flip != f) {
+        std::cout << "[INFO] Arma virou! Novo flip: " << (int)f << std::endl;
+    }
+    this->flip = f;
 }
 #include "SpriteRenderer.h"
 #include "GameObject.h"
@@ -990,6 +1095,10 @@ void SpriteRenderer::SetFrameCount(int frameCountW, int frameCountH) {
 void SpriteRenderer::SetFrame(int frame, SDL_FlipMode flip) {
     sprite.SetFrame(frame);
     sprite.SetFlip(flip);
+}
+
+void SpriteRenderer::SetFlip(SDL_FlipMode f) {
+    sprite.SetFlip(f);
 }
 
 void SpriteRenderer::SetScale(float scaleX, float scaleY) {
@@ -1025,6 +1134,8 @@ void SpriteRenderer::Render() {
 #include "Character.h"
 #include "Gun.h"
 #include "PlayerController.h"
+#include "Collider.h"
+#include "Collision.h"
 #include <SDL3/SDL.h>
 
 State::State() : started (false), quitRequested(false){
@@ -1114,7 +1225,7 @@ void State::Update(float dt){
 
     Camera::Update(dt);
 
-    if(input.KeyPress(SPACE_KEY)){
+    if(input.KeyPress(SDLK_TAB)){
         GameObject* zombieObj = new GameObject();
         
         zombieObj->box.x = input.GetMouseX() + Camera::pos.x - (zombieObj->box.w / 2.0f);
@@ -1129,6 +1240,26 @@ void State::Update(float dt){
 
     for(int i = 0; i < objectArray.size(); i++){
         objectArray[i]->Update(dt);
+    }
+
+    for (int i = 0; i < objectArray.size(); i++) {
+        Collider* colliderA = objectArray[i]->GetComponent<Collider>();
+        if (!colliderA) continue;
+
+        // j = i + 1 garante que cada par (A,B) é testado apenas uma vez e previne testar (A,A)
+        for (int j = i + 1; j < objectArray.size(); j++) {
+            Collider* colliderB = objectArray[j]->GetComponent<Collider>();
+            if (!colliderB) continue;
+
+            //converte pra radiano
+            float angleRadA = objectArray[i]->GetAngleDeg() * (3.14159265359f / 180.0f);
+            float angleRadB = objectArray[j]->GetAngleDeg() * (3.14159265359f / 180.0f);
+
+            if (Collision::IsColliding(colliderA->box, colliderB->box, angleRadA, angleRadB)) {
+                objectArray[i]->NotifyCollision(*objectArray[j]);
+                objectArray[j]->NotifyCollision(*objectArray[i]);
+            }
+        }
     }
 
     for(int i = 0; i < objectArray.size(); i++){
@@ -1314,6 +1445,7 @@ float Vec2::Inclination(const Vec2& dst) const { return (dst - *this).Inclinatio
 #include "SpriteRenderer.h"
 #include "Animator.h"
 #include "Animation.h"
+#include "Collider.h"
 
 Zombie::Zombie(GameObject& associated) : Component(associated), hitpoints(100) {
     SpriteRenderer* sprite = new SpriteRenderer(associated, "assets/img/Enemy.png", 3, 2);
@@ -1325,6 +1457,8 @@ Zombie::Zombie(GameObject& associated) : Component(associated), hitpoints(100) {
     
     associated.AddComponent(animator);
     animator->SetAnimation("walking");
+
+    associated.AddComponent(new Collider(associated));
 
     deathSound.Open("assets/audio/Dead.wav");
 }
@@ -1451,6 +1585,117 @@ public:
     void Issue(Command task);
 };
 #pragma once
+#include "Component.h"
+#include "Vec2.h"
+#include "Rect.h"
+
+class Collider : public Component {
+private:
+    Vec2 scale;
+    Vec2 offset;
+
+public:
+    Rect box;
+
+    Collider(GameObject& associated, Vec2 scale = {1, 1}, Vec2 offset = {0, 0});
+    
+    void Update(float dt) override;
+    void Render() override;
+    
+    void SetScale(Vec2 scale);
+    void SetOffset(Vec2 offset);
+};
+#pragma once
+#include "Rect.h"
+#include "Vec2.h"
+
+#include <algorithm>
+#include <cmath>
+
+class Collision {
+
+	public:
+		// Observação: IsColliding espera ângulos em radianos!
+		// Para usar graus, forneça a sua própria implementação de Rotate,
+		// ou transforme os ângulos no corpo de IsColliding.
+		static inline bool IsColliding(Rect& a, Rect& b, float angleOfA, float angleOfB) {
+			Vec2 A[] = { Vec2( a.x, a.y + a.h ),
+						  Vec2( a.x + a.w, a.y + a.h ),
+						  Vec2( a.x + a.w, a.y ),
+						  Vec2( a.x, a.y )
+						};
+			Vec2 B[] = { Vec2( b.x, b.y + b.h ),
+						  Vec2( b.x + b.w, b.y + b.h ),
+						  Vec2( b.x + b.w, b.y ),
+						  Vec2( b.x, b.y )
+						};
+
+			for (auto& v : A) {
+				v = Rotate(v - a.Center(), angleOfA) + a.Center();
+			}
+
+			for (auto& v : B) {
+				v = Rotate(v - b.Center(), angleOfB) + b.Center();
+			}
+
+			Vec2 axes[] = { Norm(A[0] - A[1]), Norm(A[1] - A[2]), Norm(B[0] - B[1]), Norm(B[1] - B[2]) };
+
+			for (auto& axis : axes) {
+				float P[4];
+
+				for (int i = 0; i < 4; ++i) P[i] = Dot(A[i], axis);
+
+				float minA = *std::min_element(P, P + 4);
+				float maxA = *std::max_element(P, P + 4);
+
+				for (int i = 0; i < 4; ++i) P[i] = Dot(B[i], axis);
+
+				float minB = *std::min_element(P, P + 4);
+				float maxB = *std::max_element(P, P + 4);
+
+				if (maxA < minB || minA > maxB)
+					return false;
+			}
+
+			return true;
+		}
+
+	private:
+
+		static inline float Mag(const Vec2& p) {
+			return std::sqrt(p.x * p.x + p.y * p.y);
+		}
+
+		static inline Vec2 Norm(const Vec2& p) {
+			return p * (1.f / Mag(p));
+		}
+
+		static inline float Dot(const Vec2& a, const Vec2& b) {
+			return a.x * b.x + a.y * b.y;
+		}
+
+		static inline Vec2 Rotate(const Vec2& p, float angle) {
+			float cs = std::cos(angle), sn = std::sin(angle);
+			return Vec2 ( p.x * cs - p.y * sn, p.x * sn + p.y * cs );
+		}
+};
+
+// Aqui estão três operadores que sua classe Vec2 deve precisar, se já não tiver. 
+// Se sua classe tiver métodos para Mag, Norm, Dot e/ou Rotate, você pode substituir
+// os usos desses métodos por usos dos seus, mas garanta que deem resultados corretos.
+
+// Vec2 operator+(const Vec2& rhs) const {
+//    return Vec2(x + rhs.x, y + rhs.y);
+// }
+
+// Vec2 operator-(const Vec2& rhs) const {
+//    return Vec2(x - rhs.x, y - rhs.y);
+// }
+
+// Vec2 operator*(const float rhs) const {
+//    return Vec2(x * rhs, y * rhs);
+// }
+#pragma once
 #include "Vec2.h"
 
 class Command {
@@ -1477,6 +1722,7 @@ public:
     
     //obs: perguntar se pode usar destructor virtual
     virtual ~Component() = default; 
+    virtual void NotifyCollision(GameObject& other) {}
 
     virtual void Update(float dt) = 0;
     virtual void Render() = 0;
@@ -1546,9 +1792,11 @@ public:
     void RequestDelete();
     void AddComponent(Component* cpt);
     void RemoveComponent(Component* cpt);
+    void NotifyCollision(GameObject& other);
     void Start();
 
     double GetAngleDeg() const { return angleDeg; }
+    void SetAngleDeg(double angle) { angleDeg = angle; }
 
     //implementação do template para retornar o tipo certo
     template<typename T>
@@ -1780,6 +2028,7 @@ public:
     void Open(std::string file);
     void SetFrameCount(int frameCountW, int frameCountH);
     void SetFrame(int frame, SDL_FlipMode flip = SDL_FLIP_NONE);
+    void SetFlip(SDL_FlipMode f);
     
     //overide dos métodos abstratos
     void Update(float dt) override;

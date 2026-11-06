@@ -27,7 +27,8 @@ void Animator::Update(float dt) {
         //atualiza o frame no SpriteRenderer do mesmo objeto
         SpriteRenderer* sprite = associated.GetComponent<SpriteRenderer>();
         if (sprite != nullptr) {
-            sprite->SetFrame(currentFrame, animations[currentAnimationName].flip);
+            sprite->SetFrame(currentFrame);
+            sprite->SetFlip(animations[currentAnimationName].flip);
         }
     }
 }
@@ -54,7 +55,8 @@ void Animator::SetAnimation(std::string name) {
         //chama SetFrame no SpriteRenderer
         SpriteRenderer* sprite = associated.GetComponent<SpriteRenderer>();
         if (sprite != nullptr) {
-            sprite->SetFrame(currentFrame, it->second.flip);
+            sprite->SetFrame(currentFrame);
+            sprite->SetFlip(it->second.flip);
         }
     }
 }

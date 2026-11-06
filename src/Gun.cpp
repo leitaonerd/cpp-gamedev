@@ -36,22 +36,49 @@ void Gun::Update(float dt) {
     associated.box.y += std::sin(rad) * 12.0f;
 
     // máquina de estados de cooldown (0 a 3)
-    if (cooldownState == 1) {
-        // disparo efetuado, entrando em recarga
-        if (cdTimer.Get() >= 0.1f) {
+    SpriteRenderer* sprite = associated.GetComponent<SpriteRenderer>();
+    SDL_FlipMode flip = (angle > 90.0f || angle < -90.0f) ? SDL_FLIP_VERTICAL : SDL_FLIP_NONE;
+    if (sprite) {
+        sprite->SetFlip(flip); 
+    }
+    std::cout << "Gun Update - Angulo: " << angle << " | Flip calculado: " << (int)flip << std::endl;
+    associated.SetAngleDeg(angle);
+    
+    if(cooldownState == 0){
+        // estado ocioso: garante que fica no primeiro quadro
+        if (sprite) sprite->SetFrame(0);
+        
+    } else if(cooldownState == 1){
+        // disparo efetuado: anima os quadros 1 e 2 durante 0.1s
+        if(sprite){
+            int frame = 1 + static_cast<int>((cdTimer.Get() / 0.1f) * 2.0f);
+            if (frame > 2) frame = 2;
+            sprite->SetFrame(frame);
+        }
+
+        if(cdTimer.Get() >= 0.1f){
             cooldownState = 2;
             cdTimer.Restart();
             reloadSound.Play(1);
         }
-    } else if (cooldownState == 2) {
-        // animação de recarga (pump-action)
-        if (cdTimer.Get() >= 0.3f) {
+        
+    } else if(cooldownState == 2){
+        // recarga (pump-action): anima os quadros 3, 4 e 5 durante 0.3s
+        if(sprite){
+            int frame = 3 + static_cast<int>((cdTimer.Get() / 0.3f) * 3.0f);
+            if (frame > 5) frame = 5;
+            sprite->SetFrame(frame);
+        }
+
+        if(cdTimer.Get() >= 0.3f){
             cooldownState = 3;
             cdTimer.Restart();
         }
-    } else if (cooldownState == 3) {
+        
+    } else if(cooldownState == 3){
         // fim da recarga, pronto para atirar novamente
         cooldownState = 0;
+        if (sprite) sprite->SetFrame(0);
     }
 }
 

@@ -13,7 +13,8 @@ public:
     
     void Open(std::string file);
     void SetFrameCount(int frameCountW, int frameCountH);
-    void SetFrame(int frame, SDL_FlipMode flip = SDL_FLIP_NONE);
+    void SetFrame(int frame);
+    void SetFlip(SDL_FlipMode f);
     
     //overide dos métodos abstratos
     void Update(float dt) override;

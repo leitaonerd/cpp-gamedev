@@ -26,9 +26,12 @@ void SpriteRenderer::SetFrameCount(int frameCountW, int frameCountH) {
     sprite.SetFrameCount(frameCountW, frameCountH);
 }
 
-void SpriteRenderer::SetFrame(int frame, SDL_FlipMode flip) {
+void SpriteRenderer::SetFrame(int frame) {
     sprite.SetFrame(frame);
-    sprite.SetFlip(flip);
+}
+
+void SpriteRenderer::SetFlip(SDL_FlipMode f) {
+    sprite.SetFlip(f);
 }
 
 void SpriteRenderer::SetScale(float scaleX, float scaleY) {

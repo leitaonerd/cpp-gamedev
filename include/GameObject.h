@@ -28,6 +28,7 @@ public:
     void Start();
 
     double GetAngleDeg() const { return angleDeg; }
+    void SetAngleDeg(double angle) { angleDeg = angle; }
 
     //implementação do template para retornar o tipo certo
     template<typename T>
