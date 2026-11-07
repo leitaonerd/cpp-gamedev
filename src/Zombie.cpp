@@ -6,6 +6,8 @@
 #include "Collider.h"
 #include "Bullet.h"
 
+int Zombie::zombieCount = 0;
+
 Zombie::Zombie(GameObject& associated) : Component(associated), hitpoints(100) {
     SpriteRenderer* sprite = new SpriteRenderer(associated, "assets/img/Enemy.png", 3, 2);
     associated.AddComponent(sprite);
@@ -20,6 +22,12 @@ Zombie::Zombie(GameObject& associated) : Component(associated), hitpoints(100) {
     associated.AddComponent(new Collider(associated));
 
     deathSound.Open("assets/audio/Dead.wav");
+    zombieCount++;
+}
+
+
+Zombie::~Zombie() {
+    zombieCount--; // Decrementa quando o cadáver é removido da memória
 }
 
 void Zombie::Damage(int damage) {
@@ -37,7 +45,7 @@ void Zombie::Damage(int damage) {
         }
 
         deathSound.Play(1);
-        
+
         Collider* collider = associated.GetComponent<Collider>();
         if (collider != nullptr) {
             associated.RemoveComponent(collider);
@@ -55,6 +63,12 @@ void Zombie::NotifyCollision(GameObject& other) {
 }
 
 void Zombie::Update(float dt) {
+    if (isDead) {
+        deathTimer.Update(dt);
+        if (deathTimer.Get() >= 5.0f) {
+            associated.RequestDelete();
+        }
+    }
 }
 
 void Zombie::Render() {

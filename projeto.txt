@@ -27,7 +27,8 @@ void Animator::Update(float dt) {
         //atualiza o frame no SpriteRenderer do mesmo objeto
         SpriteRenderer* sprite = associated.GetComponent<SpriteRenderer>();
         if (sprite != nullptr) {
-            sprite->SetFrame(currentFrame, animations[currentAnimationName].flip);
+            sprite->SetFrame(currentFrame);
+            sprite->SetFlip(animations[currentAnimationName].flip);
         }
     }
 }
@@ -54,7 +55,8 @@ void Animator::SetAnimation(std::string name) {
         //chama SetFrame no SpriteRenderer
         SpriteRenderer* sprite = associated.GetComponent<SpriteRenderer>();
         if (sprite != nullptr) {
-            sprite->SetFrame(currentFrame, it->second.flip);
+            sprite->SetFrame(currentFrame);
+            sprite->SetFlip(it->second.flip);
         }
     }
 }
@@ -69,6 +71,7 @@ void Animator::AddAnimation(std::string name, Animation anim) {
 #include "GameObject.h"
 #include "SpriteRenderer.h"
 #include "Collider.h"
+#include "Zombie.h"
 #include <cmath>
 
 Bullet::Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance)
@@ -93,6 +96,13 @@ void Bullet::Update(float dt) {
     distanceLeft -= this->speed.Magnitude() * dt;
 
     if (distanceLeft <= 0) {
+        associated.RequestDelete();
+    }
+}
+
+void Bullet::NotifyCollision(GameObject& other) {
+    Zombie* hitZombie = other.GetComponent<Zombie>();
+    if (hitZombie != nullptr) {
         associated.RequestDelete();
     }
 }
@@ -332,6 +342,8 @@ Command::Command(CommandType type, float x, float y)
 #include "InputManager.h"
 #include <SDL3_image/SDL_image.h>
 #include <iostream>
+#include <cstdlib>
+#include <ctime>
 
 Game* Game::instance = nullptr;
 
@@ -343,6 +355,7 @@ Game& Game::GetInstance(){
 }
 
 Game::Game(std::string title, int width, int height){
+    srand(time(NULL));
     if(instance != nullptr){
         std::cerr << "Erro na lógica do jogo. Instância de jogo já existe" << std::endl;
         //erro tratar depois
@@ -524,7 +537,6 @@ void Gun::Update(float dt) {
     if (sprite) {
         sprite->SetFlip(flip); 
     }
-    std::cout << "Gun Update - Angulo: " << angle << " | Flip calculado: " << (int)flip << std::endl;
     associated.SetAngleDeg(angle);
     
     if(cooldownState == 0){
@@ -572,8 +584,6 @@ void Gun::Shoot(Vec2 target) {
         return;
     }
 
-    std::cout << "Atirou! A bala foi criada." << std::endl;
-
     // calcula ângulo para o alvo
     Vec2 pos = associated.box.Center();
     Vec2 dir = target - pos;
@@ -587,7 +597,7 @@ void Gun::Shoot(Vec2 target) {
     bulletObj->box.y = pos.y - 4;
 
     float speed = 500.0f;
-    int damage = 25;
+    int damage = 100;
     float maxDistance = 600.0f;
 
     Bullet* bullet = new Bullet(*bulletObj, angle, speed, damage, maxDistance);
@@ -1009,9 +1019,6 @@ void Sprite::Render(float x, float y, float w, float h, double angle){
         float renderX = x - (cameraFollower ? 0 : Camera::pos.x);
         float renderY = y - (cameraFollower ? 0 : Camera::pos.y);
 
-        if (flip == SDL_FLIP_VERTICAL) {
-            std::cout << "Renderizando com Flip Vertical! Angulo: " << angle << std::endl;
-        }
     
         SDL_FRect dstRect = { renderX, renderY, w, h };
         SDL_RenderTextureRotated(Game::GetInstance().GetRenderer(), texture, &clipRect, &dstRect, angle, nullptr, flip);
@@ -1059,9 +1066,6 @@ Vec2 Sprite::GetScale() {
 }
 
 void Sprite::SetFlip(SDL_FlipMode f) {
-    if (this->flip != f) {
-        std::cout << "[INFO] Arma virou! Novo flip: " << (int)f << std::endl;
-    }
     this->flip = f;
 }
 #include "SpriteRenderer.h"
@@ -1092,9 +1096,8 @@ void SpriteRenderer::SetFrameCount(int frameCountW, int frameCountH) {
     sprite.SetFrameCount(frameCountW, frameCountH);
 }
 
-void SpriteRenderer::SetFrame(int frame, SDL_FlipMode flip) {
+void SpriteRenderer::SetFrame(int frame) {
     sprite.SetFrame(frame);
-    sprite.SetFlip(flip);
 }
 
 void SpriteRenderer::SetFlip(SDL_FlipMode f) {
@@ -1136,6 +1139,7 @@ void SpriteRenderer::Render() {
 #include "PlayerController.h"
 #include "Collider.h"
 #include "Collision.h"
+#include "WaveSpawner.h"
 #include <SDL3/SDL.h>
 
 State::State() : started (false), quitRequested(false){
@@ -1176,6 +1180,12 @@ State::State() : started (false), quitRequested(false){
 
     // travar foco da câmera no jogador
     Camera::Follow(playerObj);
+
+    GameObject* spawnerObj = new GameObject();
+    //1 zumbi a cada 2 segundos
+    WaveSpawner* spawner = new WaveSpawner(*spawnerObj); 
+    spawnerObj->AddComponent(spawner);
+    AddObject(spawnerObj);
 }
 
 State::~State(){
@@ -1225,18 +1235,6 @@ void State::Update(float dt){
 
     Camera::Update(dt);
 
-    if(input.KeyPress(SDLK_TAB)){
-        GameObject* zombieObj = new GameObject();
-        
-        zombieObj->box.x = input.GetMouseX() + Camera::pos.x - (zombieObj->box.w / 2.0f);
-        zombieObj->box.y = input.GetMouseY() + Camera::pos.y - (zombieObj->box.h / 2.0f);
-
-        Zombie* zombieLogic = new Zombie(*zombieObj);
-        zombieObj->AddComponent(zombieLogic);
-        AddObject(zombieObj);
-    }
-
-    Camera::Update(dt);
 
     for(int i = 0; i < objectArray.size(); i++){
         objectArray[i]->Update(dt);
@@ -1440,12 +1438,68 @@ float Vec2::Distance(const Vec2& dst) const { return (*this - dst).Magnitude(); 
 float Vec2::Inclination() const { return std::atan2(y, x); }
 
 float Vec2::Inclination(const Vec2& dst) const { return (dst - *this).Inclination(); }
+#include "WaveSpawner.h"
+#include "GameObject.h"
+#include "Zombie.h"
+#include "Game.h"
+#include "Camera.h"
+#include <cstdlib> // Para rand()
+#include <cmath>
+
+WaveSpawner::WaveSpawner(GameObject& associated) 
+    : Component(associated), zombieCounter(0), currentWave(0) {
+    
+    waves.push_back(Wave(3, 2.0f)); // Wave 0: 3 zumbis, 1 a cada 2 seg
+    waves.push_back(Wave(5, 1.5f)); // Wave 1: 5 zumbis, 1 a cada 1.5 seg
+    waves.push_back(Wave(10, 1.0f)); // Wave 2: 10 zumbis, 1 a cada 1 seg
+}
+
+void WaveSpawner::Update(float dt) {
+    if (currentWave >= waves.size()) {
+        associated.RequestDelete();
+        return;
+    }
+
+    zombieCooldownTimer.Update(dt);
+
+    Wave& wave = waves[currentWave];
+
+    if (zombieCounter < wave.zombies) {
+        if (zombieCooldownTimer.Get() >= wave.cooldown) {
+            zombieCooldownTimer.Restart();
+            
+            GameObject* zombieObj = new GameObject();
+            
+            float randomAngle = (rand() % 360) * (3.14159f / 180.0f);
+            
+            // Posição a uma distância fora da tela a partir da câmera (ex: 800 pixels de raio)
+            float spawnDistance = 800.0f; 
+            zombieObj->box.x = Camera::pos.x + 600 + (std::cos(randomAngle) * spawnDistance); // 600 é meio da tela
+            zombieObj->box.y = Camera::pos.y + 450 + (std::sin(randomAngle) * spawnDistance); // 450 é meio da tela
+
+            Zombie* zombie = new Zombie(*zombieObj);
+            zombieObj->AddComponent(zombie);
+
+            Game::GetInstance().GetState().AddObject(zombieObj);
+            
+            zombieCounter++;
+        }
+    } else if (Zombie::zombieCount == 0) {
+        currentWave++;
+        zombieCounter = 0;
+    }
+}
+
+void WaveSpawner::Render() { }
 #include "Zombie.h"
 #include "GameObject.h"
 #include "SpriteRenderer.h"
 #include "Animator.h"
 #include "Animation.h"
 #include "Collider.h"
+#include "Bullet.h"
+
+int Zombie::zombieCount = 0;
 
 Zombie::Zombie(GameObject& associated) : Component(associated), hitpoints(100) {
     SpriteRenderer* sprite = new SpriteRenderer(associated, "assets/img/Enemy.png", 3, 2);
@@ -1461,6 +1515,12 @@ Zombie::Zombie(GameObject& associated) : Component(associated), hitpoints(100) {
     associated.AddComponent(new Collider(associated));
 
     deathSound.Open("assets/audio/Dead.wav");
+    zombieCount++;
+}
+
+
+Zombie::~Zombie() {
+    zombieCount--; // Decrementa quando o cadáver é removido da memória
 }
 
 void Zombie::Damage(int damage) {
@@ -1478,12 +1538,24 @@ void Zombie::Damage(int damage) {
         }
 
         deathSound.Play(1);
+
+        Collider* collider = associated.GetComponent<Collider>();
+        if (collider != nullptr) {
+            associated.RemoveComponent(collider);
+        }
+    }
+}
+
+void Zombie::NotifyCollision(GameObject& other) {
+    if (isDead) return;
+
+    Bullet* hitBullet = other.GetComponent<Bullet>();
+    if (hitBullet != nullptr) {
+        Damage(hitBullet->GetDamage());
     }
 }
 
 void Zombie::Update(float dt) {
-    //mudar depois
-    Damage(1);
 }
 
 void Zombie::Render() {
@@ -1540,6 +1612,7 @@ public:
     Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance);
     void Update(float dt) override;
     void Render() override;
+    void NotifyCollision(GameObject& other) override;
     int GetDamage();
 };
 #pragma once
@@ -2027,7 +2100,7 @@ public:
     
     void Open(std::string file);
     void SetFrameCount(int frameCountW, int frameCountH);
-    void SetFrame(int frame, SDL_FlipMode flip = SDL_FLIP_NONE);
+    void SetFrame(int frame);
     void SetFlip(SDL_FlipMode f);
     
     //overide dos métodos abstratos
@@ -2150,6 +2223,31 @@ public:
 };
 #pragma once
 #include "Component.h"
+#include "Timer.h"
+#include <vector>
+
+class Wave {
+public:
+    int zombies;
+    float cooldown;
+
+    Wave(int zombies, float cooldown) : zombies(zombies), cooldown(cooldown) {}
+};
+
+class WaveSpawner : public Component {
+private:
+    int zombieCounter;
+    int currentWave;
+    Timer zombieCooldownTimer;
+    std::vector<Wave> waves;
+
+public:
+    WaveSpawner(GameObject& associated);
+    void Update(float dt) override;
+    void Render() override;
+};
+#pragma once
+#include "Component.h"
 #include "Sound.h"
 
 class Zombie : public Component {
@@ -2159,10 +2257,13 @@ private:
     Sound deathSound;
 
 public:
+    static int zombieCount;
+
     Zombie(GameObject& associated);
-    
+    ~Zombie();
     
     void Damage(int damage);
     void Update(float dt) override;
     void Render() override;
+    void NotifyCollision(GameObject& other) override;
 };

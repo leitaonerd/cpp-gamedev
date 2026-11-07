@@ -53,9 +53,6 @@ void Sprite::Render(float x, float y, float w, float h, double angle){
         float renderX = x - (cameraFollower ? 0 : Camera::pos.x);
         float renderY = y - (cameraFollower ? 0 : Camera::pos.y);
 
-        if (flip == SDL_FLIP_VERTICAL) {
-            std::cout << "Renderizando com Flip Vertical! Angulo: " << angle << std::endl;
-        }
     
         SDL_FRect dstRect = { renderX, renderY, w, h };
         SDL_RenderTextureRotated(Game::GetInstance().GetRenderer(), texture, &clipRect, &dstRect, angle, nullptr, flip);
@@ -103,8 +100,5 @@ Vec2 Sprite::GetScale() {
 }
 
 void Sprite::SetFlip(SDL_FlipMode f) {
-    if (this->flip != f) {
-        std::cout << "[INFO] Arma virou! Novo flip: " << (int)f << std::endl;
-    }
     this->flip = f;
 }

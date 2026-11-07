@@ -33,7 +33,7 @@ void WaveSpawner::Update(float dt) {
             float randomAngle = (rand() % 360) * (3.14159f / 180.0f);
             
             // Posição a uma distância fora da tela a partir da câmera (ex: 800 pixels de raio)
-            float spawnDistance = 800.0f; 
+            float spawnDistance = 400.0f; 
             zombieObj->box.x = Camera::pos.x + 600 + (std::cos(randomAngle) * spawnDistance); // 600 é meio da tela
             zombieObj->box.y = Camera::pos.y + 450 + (std::sin(randomAngle) * spawnDistance); // 450 é meio da tela
 
@@ -44,7 +44,7 @@ void WaveSpawner::Update(float dt) {
             
             zombieCounter++;
         }
-    } else {
+    } else if (Zombie::zombieCount == 0) {
         currentWave++;
         zombieCounter = 0;
     }
