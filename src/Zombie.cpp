@@ -37,6 +37,11 @@ void Zombie::Damage(int damage) {
         }
 
         deathSound.Play(1);
+        
+        Collider* collider = associated.GetComponent<Collider>();
+        if (collider != nullptr) {
+            associated.RemoveComponent(collider);
+        }
     }
 }
 
