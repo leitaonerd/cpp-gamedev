@@ -10,6 +10,7 @@
 #include "PlayerController.h"
 #include "Collider.h"
 #include "Collision.h"
+#include "WaveSpawner.h"
 #include <SDL3/SDL.h>
 
 State::State() : started (false), quitRequested(false){
@@ -50,6 +51,12 @@ State::State() : started (false), quitRequested(false){
 
     // travar foco da câmera no jogador
     Camera::Follow(playerObj);
+
+    GameObject* spawnerObj = new GameObject();
+    //1 zumbi a cada 2 segundos
+    WaveSpawner* spawner = new WaveSpawner(*spawnerObj, 2.0f); 
+    spawnerObj->AddComponent(spawner);
+    AddObject(spawnerObj);
 }
 
 State::~State(){
@@ -99,18 +106,6 @@ void State::Update(float dt){
 
     Camera::Update(dt);
 
-    if(input.KeyPress(SDLK_TAB)){
-        GameObject* zombieObj = new GameObject();
-        
-        zombieObj->box.x = input.GetMouseX() + Camera::pos.x - (zombieObj->box.w / 2.0f);
-        zombieObj->box.y = input.GetMouseY() + Camera::pos.y - (zombieObj->box.h / 2.0f);
-
-        Zombie* zombieLogic = new Zombie(*zombieObj);
-        zombieObj->AddComponent(zombieLogic);
-        AddObject(zombieObj);
-    }
-
-    Camera::Update(dt);
 
     for(int i = 0; i < objectArray.size(); i++){
         objectArray[i]->Update(dt);
