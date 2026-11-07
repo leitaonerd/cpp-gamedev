@@ -2,6 +2,7 @@
 #include "GameObject.h"
 #include "SpriteRenderer.h"
 #include "Collider.h"
+#include "Zombie.h"
 #include <cmath>
 
 Bullet::Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance)
@@ -26,6 +27,13 @@ void Bullet::Update(float dt) {
     distanceLeft -= this->speed.Magnitude() * dt;
 
     if (distanceLeft <= 0) {
+        associated.RequestDelete();
+    }
+}
+
+void Bullet::NotifyCollision(GameObject& other) {
+    Zombie* hitZombie = other.GetComponent<Zombie>();
+    if (hitZombie != nullptr) {
         associated.RequestDelete();
     }
 }

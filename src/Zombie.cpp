@@ -4,6 +4,7 @@
 #include "Animator.h"
 #include "Animation.h"
 #include "Collider.h"
+#include "Bullet.h"
 
 Zombie::Zombie(GameObject& associated) : Component(associated), hitpoints(100) {
     SpriteRenderer* sprite = new SpriteRenderer(associated, "assets/img/Enemy.png", 3, 2);
@@ -39,9 +40,16 @@ void Zombie::Damage(int damage) {
     }
 }
 
+void Zombie::NotifyCollision(GameObject& other) {
+    if (isDead) return;
+
+    Bullet* hitBullet = other.GetComponent<Bullet>();
+    if (hitBullet != nullptr) {
+        Damage(hitBullet->GetDamage());
+    }
+}
+
 void Zombie::Update(float dt) {
-    //mudar depois
-    Damage(1);
 }
 
 void Zombie::Render() {

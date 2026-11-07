@@ -12,5 +12,6 @@ public:
     Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance);
     void Update(float dt) override;
     void Render() override;
+    void NotifyCollision(GameObject& other) override;
     int GetDamage();
 };

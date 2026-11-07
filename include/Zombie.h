@@ -15,4 +15,5 @@ public:
     void Damage(int damage);
     void Update(float dt) override;
     void Render() override;
+    void NotifyCollision(GameObject& other) override;
 };

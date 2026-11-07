@@ -104,7 +104,7 @@ void Gun::Shoot(Vec2 target) {
     bulletObj->box.y = pos.y - 4;
 
     float speed = 500.0f;
-    int damage = 25;
+    int damage = 100;
     float maxDistance = 600.0f;
 
     Bullet* bullet = new Bullet(*bulletObj, angle, speed, damage, maxDistance);
