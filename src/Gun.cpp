@@ -41,7 +41,6 @@ void Gun::Update(float dt) {
     if (sprite) {
         sprite->SetFlip(flip); 
     }
-    std::cout << "Gun Update - Angulo: " << angle << " | Flip calculado: " << (int)flip << std::endl;
     associated.SetAngleDeg(angle);
     
     if(cooldownState == 0){
@@ -88,8 +87,6 @@ void Gun::Shoot(Vec2 target) {
     if (cooldownState != 0) {
         return;
     }
-
-    std::cout << "Atirou! A bala foi criada." << std::endl;
 
     // calcula ângulo para o alvo
     Vec2 pos = associated.box.Center();
