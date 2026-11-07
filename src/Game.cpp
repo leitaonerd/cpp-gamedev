@@ -2,6 +2,8 @@
 #include "InputManager.h"
 #include <SDL3_image/SDL_image.h>
 #include <iostream>
+#include <cstdlib>
+#include <ctime>
 
 Game* Game::instance = nullptr;
 
@@ -13,6 +15,7 @@ Game& Game::GetInstance(){
 }
 
 Game::Game(std::string title, int width, int height){
+    srand(time(NULL));
     if(instance != nullptr){
         std::cerr << "Erro na lógica do jogo. Instância de jogo já existe" << std::endl;
         //erro tratar depois

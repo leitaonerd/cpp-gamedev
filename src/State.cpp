@@ -54,7 +54,7 @@ State::State() : started (false), quitRequested(false){
 
     GameObject* spawnerObj = new GameObject();
     //1 zumbi a cada 2 segundos
-    WaveSpawner* spawner = new WaveSpawner(*spawnerObj, 2.0f); 
+    WaveSpawner* spawner = new WaveSpawner(*spawnerObj); 
     spawnerObj->AddComponent(spawner);
     AddObject(spawnerObj);
 }
