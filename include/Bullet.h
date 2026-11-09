@@ -10,7 +10,7 @@ private:
 
 public:
     bool targetsPlayer;
-    Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance, bool targetsPlayer;);
+    Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance, bool targetsPlayer);
     void Update(float dt) override;
     void Render() override;
     void NotifyCollision(GameObject& other) override;

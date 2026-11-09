@@ -3,6 +3,7 @@
 #include "Zombie.h"
 #include "Game.h"
 #include "Camera.h"
+#include "AIController.h"
 #include <cstdlib> // Para rand()
 #include <cmath>
 
@@ -28,23 +29,29 @@ void WaveSpawner::Update(float dt) {
         if (zombieCooldownTimer.Get() >= wave.cooldown) {
             zombieCooldownTimer.Restart();
             
-            GameObject* zombieObj = new GameObject();
+            GameObject* enemyObj = new GameObject();
             
             float randomAngle = (rand() % 360) * (3.14159f / 180.0f);
             
-            // Posição a uma distância fora da tela a partir da câmera (ex: 800 pixels de raio)
             float spawnDistance = 400.0f; 
-            zombieObj->box.x = Camera::pos.x + 600 + (std::cos(randomAngle) * spawnDistance); // 600 é meio da tela
-            zombieObj->box.y = Camera::pos.y + 450 + (std::sin(randomAngle) * spawnDistance); // 450 é meio da tela
+            enemyObj->box.x = Camera::pos.x + 600 + (std::cos(randomAngle) * spawnDistance); // 600 é meio da tela
+            enemyObj->box.y = Camera::pos.y + 450 + (std::sin(randomAngle) * spawnDistance); // 450 é meio da tela
 
-            Zombie* zombie = new Zombie(*zombieObj);
-            zombieObj->AddComponent(zombie);
+            // 30% NPC / 70% zumbi
+            if (rand() % 100 < 30) {
+                AIController* npc = new AIController(*enemyObj);
+                enemyObj->AddComponent(npc);
+            } else {
+                Zombie* zombie = new Zombie(*enemyObj);
+                enemyObj->AddComponent(zombie);
+            }
 
-            Game::GetInstance().GetState().AddObject(zombieObj);
+            Game::GetInstance().GetState().AddObject(enemyObj);
             
             zombieCounter++;
         }
-    } else if (Zombie::zombieCount == 0) {
+    } 
+    else if (Zombie::zombieCount == 0 && AIController::npcCounter == 0) {
         currentWave++;
         zombieCounter = 0;
     }
