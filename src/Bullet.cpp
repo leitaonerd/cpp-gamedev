@@ -3,10 +3,11 @@
 #include "SpriteRenderer.h"
 #include "Collider.h"
 #include "Zombie.h"
+#include "Character.h"
 #include <cmath>
 
-Bullet::Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance)
-    : Component(associated), distanceLeft(maxDistance), damage(damage) {
+Bullet::Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance, bool targetsPlayer)
+    : Component(associated), distanceLeft(maxDistance), damage(damage), targetsPlayer(targetsPlayer) {
 
     SpriteRenderer* renderer = new SpriteRenderer(associated, "assets/img/Bullet.png");
     associated.AddComponent(renderer);
@@ -32,8 +33,11 @@ void Bullet::Update(float dt) {
 }
 
 void Bullet::NotifyCollision(GameObject& other) {
-    Zombie* hitZombie = other.GetComponent<Zombie>();
-    if (hitZombie != nullptr) {
+    if (other.GetComponent<Zombie>() != nullptr && !targetsPlayer) {
+        associated.RequestDelete();
+    }
+    // Se foi atirada pelo NPC e acertou o player
+    else if (other.GetComponent<Character>() != nullptr && targetsPlayer) {
         associated.RequestDelete();
     }
 }

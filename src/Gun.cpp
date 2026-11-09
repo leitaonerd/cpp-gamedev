@@ -104,7 +104,7 @@ void Gun::Shoot(Vec2 target) {
     int damage = 100;
     float maxDistance = 600.0f;
 
-    Bullet* bullet = new Bullet(*bulletObj, angle, speed, damage, maxDistance);
+    Bullet* bullet = new Bullet(*bulletObj, angle, speed, damage, maxDistance, false);
     bulletObj->AddComponent(bullet);
 
     Game::GetInstance().GetState().AddObject(bulletObj);

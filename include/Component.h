@@ -8,6 +8,7 @@ protected:
     GameObject& associated;
 
 public:
+    GameObject& GetAssociated() { return associated; }
     //recebe a referência e a iniciasliza na lista
     Component(GameObject& associated) : associated(associated) {}
     

@@ -5,6 +5,7 @@
 #include "Animation.h"
 #include "Collider.h"
 #include "Bullet.h"
+#include "Character.h"
 
 int Zombie::zombieCount = 0;
 
@@ -68,6 +69,18 @@ void Zombie::Update(float dt) {
         if (deathTimer.Get() >= 5.0f) {
             associated.RequestDelete();
         }
+        return;
+    }
+
+    if (Character::player != nullptr) {
+        Vec2 playerPos = Character::player->GetAssociated().box.Center();
+        Vec2 currentPos = associated.box.Center();
+        
+        Vec2 dir = (playerPos - currentPos).GetNormalized();
+        float speed = 80.0f * dt;
+        
+        associated.box.x += dir.x * speed;
+        associated.box.y += dir.y * speed;
     }
 }
 
