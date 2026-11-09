@@ -13,6 +13,7 @@ private:
 
     int hp;
     bool isDead;
+    bool facingLeft = false;
     Timer deathTimer;
     Sound deathSound;
 

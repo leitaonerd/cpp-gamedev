@@ -7,6 +7,7 @@ class Zombie : public Component {
 private:
     int hitpoints;
     bool isDead = false;
+    bool facingLeft = false;
     Timer deathTimer;
     Sound deathSound;
 

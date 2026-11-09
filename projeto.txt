@@ -1,3 +1,135 @@
+#include "AIController.h"
+#include "Character.h"
+#include "Bullet.h"
+#include "Game.h"
+#include "SpriteRenderer.h"
+#include "Animator.h"
+#include "Collider.h"
+
+int AIController::npcCounter = 0;
+
+AIController::AIController(GameObject& associated) 
+    : Component(associated), state(RESTING), hp(100), isDead(false) {
+
+    SpriteRenderer* sprite = new SpriteRenderer(associated, "assets/img/NPC.png", 3, 4);
+    associated.AddComponent(sprite);
+
+    Animator* animator = new Animator(associated);
+    animator->AddAnimation("walking_right", Animation(0, 3, 0.15f, SDL_FLIP_NONE));
+    animator->AddAnimation("walking_left", Animation(0, 3, 0.15f, SDL_FLIP_HORIZONTAL));
+    animator->AddAnimation("dead_right", Animation(5, 5, 0.15f, SDL_FLIP_NONE));
+    animator->AddAnimation("dead_left", Animation(5, 5, 0.15f, SDL_FLIP_HORIZONTAL));
+    associated.AddComponent(animator);
+    animator->SetAnimation("walking_right");
+
+    associated.AddComponent(new Collider(associated));
+
+    deathSound.Open("assets/audio/Dead.wav");
+    
+    npcCounter++;
+}
+
+AIController::~AIController() {
+    npcCounter--;
+}
+
+void AIController::Damage(int damage) {
+    hp -= damage;
+    if (isDead) return;
+
+    if (hp <= 0) {
+        isDead = true;
+        
+        Animator* animator = associated.GetComponent<Animator>();
+        if (animator != nullptr) {
+            animator->SetAnimation(facingLeft ? "dead_left" : "dead_right");
+        }
+        deathSound.Play(1);
+
+        Collider* collider = associated.GetComponent<Collider>();
+        if (collider != nullptr) {
+            associated.RemoveComponent(collider);
+        }
+    }
+}
+
+void AIController::NotifyCollision(GameObject& other) {
+    if (isDead) return;
+
+    Bullet* hitBullet = other.GetComponent<Bullet>();
+    if (hitBullet != nullptr && !hitBullet->targetsPlayer) {
+        Damage(hitBullet->GetDamage());
+    }
+}
+
+void AIController::Update(float dt) {
+    if (isDead) {
+        deathTimer.Update(dt);
+        if (deathTimer.Get() >= 5.0f) {
+            associated.RequestDelete();
+        }
+        return; 
+    }
+
+    if (Character::player == nullptr) {
+        return; 
+    }
+
+    if (state == RESTING) {
+        restTimer.Update(dt);
+        if (restTimer.Get() >= 2.0f) { 
+            destination = Character::player->GetAssociated().box.Center();
+            state = MOVING;
+        }
+    } 
+    else if (state == MOVING) {
+        Vec2 currentPos = associated.box.Center();
+        float distance = currentPos.Distance(destination);
+
+        if (distance <= 5.0f) {
+            Vec2 playerPos = Character::player->GetAssociated().box.Center();
+            float angle = (playerPos - currentPos).Inclination() * (180.0f / 3.14159265f);
+
+            if (playerPos.x < currentPos.x) facingLeft = true;
+            else facingLeft = false;
+            
+            Animator* animator = associated.GetComponent<Animator>();
+            if (animator != nullptr) {
+                animator->SetAnimation(facingLeft ? "walking_left" : "walking_right");
+            }
+
+            GameObject* bulletObj = new GameObject();
+            bulletObj->box.x = currentPos.x;
+            bulletObj->box.y = currentPos.y;
+            
+            Bullet* bullet = new Bullet(*bulletObj, angle, 300.0f, 10, 800.0f, true);
+            bulletObj->AddComponent(bullet);
+            Game::GetInstance().GetState().AddObject(bulletObj);
+
+            restTimer.Restart();
+            state = RESTING;
+        } 
+        else {
+            Vec2 dir = (destination - currentPos).GetNormalized();
+            float speed = 150.0f * dt; 
+            associated.box.x += dir.x * speed;
+            associated.box.y += dir.y * speed;
+
+            if (dir.x < -0.1f) {
+                facingLeft = true;
+            } else if (dir.x > 0.1f) {
+                facingLeft = false;
+            }
+
+            Animator* animator = associated.GetComponent<Animator>();
+            if (animator != nullptr) {
+                animator->SetAnimation(facingLeft ? "walking_left" : "walking_right");
+            }
+        }
+    }
+}
+
+void AIController::Render() {}
 #include "Animator.h"
 #include "GameObject.h"
 #include "SpriteRenderer.h"
@@ -72,10 +204,11 @@ void Animator::AddAnimation(std::string name, Animation anim) {
 #include "SpriteRenderer.h"
 #include "Collider.h"
 #include "Zombie.h"
+#include "Character.h"
 #include <cmath>
 
-Bullet::Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance)
-    : Component(associated), distanceLeft(maxDistance), damage(damage) {
+Bullet::Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance, bool targetsPlayer)
+    : Component(associated), distanceLeft(maxDistance), damage(damage), targetsPlayer(targetsPlayer) {
 
     SpriteRenderer* renderer = new SpriteRenderer(associated, "assets/img/Bullet.png");
     associated.AddComponent(renderer);
@@ -101,8 +234,11 @@ void Bullet::Update(float dt) {
 }
 
 void Bullet::NotifyCollision(GameObject& other) {
-    Zombie* hitZombie = other.GetComponent<Zombie>();
-    if (hitZombie != nullptr) {
+    if (other.GetComponent<Zombie>() != nullptr && !targetsPlayer) {
+        associated.RequestDelete();
+    }
+    // Se foi atirada pelo NPC e acertou o player
+    else if (other.GetComponent<Character>() != nullptr && targetsPlayer) {
         associated.RequestDelete();
     }
 }
@@ -164,6 +300,8 @@ void Camera::Update(float dt){
 #include "Animation.h"
 #include "Game.h"
 #include "Collider.h"
+#include "Bullet.h"
+#include "Zombie.h"
 
 Character* Character::player = nullptr;
 
@@ -209,6 +347,7 @@ void Character::Start() {
 }
 
 void Character::Update(float dt) {
+    damageCooldown.Update(dt);
     if (hp <= 0) {
         // animação de morte
         Animator* animator = associated.GetComponent<Animator>();
@@ -283,6 +422,19 @@ void Character::Render() {}
 
 void Character::Issue(Command task) {
     taskQueue.push(task);
+}
+
+void Character::NotifyCollision(GameObject& other) {
+    Bullet* bullet = other.GetComponent<Bullet>();
+    if (bullet != nullptr && bullet->targetsPlayer) {
+        hp -= bullet->GetDamage();
+    }
+
+    Zombie* zombie = other.GetComponent<Zombie>();
+    if (zombie != nullptr && damageCooldown.Get() >= 1.0f) {
+        hp -= 20;
+        damageCooldown.Restart();
+    }
 }
 #define DEBUG
 #include "Collider.h"
@@ -600,7 +752,7 @@ void Gun::Shoot(Vec2 target) {
     int damage = 100;
     float maxDistance = 600.0f;
 
-    Bullet* bullet = new Bullet(*bulletObj, angle, speed, damage, maxDistance);
+    Bullet* bullet = new Bullet(*bulletObj, angle, speed, damage, maxDistance, false);
     bulletObj->AddComponent(bullet);
 
     Game::GetInstance().GetState().AddObject(bulletObj);
@@ -1443,6 +1595,7 @@ float Vec2::Inclination(const Vec2& dst) const { return (dst - *this).Inclinatio
 #include "Zombie.h"
 #include "Game.h"
 #include "Camera.h"
+#include "AIController.h"
 #include <cstdlib> // Para rand()
 #include <cmath>
 
@@ -1468,23 +1621,29 @@ void WaveSpawner::Update(float dt) {
         if (zombieCooldownTimer.Get() >= wave.cooldown) {
             zombieCooldownTimer.Restart();
             
-            GameObject* zombieObj = new GameObject();
+            GameObject* enemyObj = new GameObject();
             
             float randomAngle = (rand() % 360) * (3.14159f / 180.0f);
             
-            // Posição a uma distância fora da tela a partir da câmera (ex: 800 pixels de raio)
-            float spawnDistance = 800.0f; 
-            zombieObj->box.x = Camera::pos.x + 600 + (std::cos(randomAngle) * spawnDistance); // 600 é meio da tela
-            zombieObj->box.y = Camera::pos.y + 450 + (std::sin(randomAngle) * spawnDistance); // 450 é meio da tela
+            float spawnDistance = 400.0f; 
+            enemyObj->box.x = Camera::pos.x + 600 + (std::cos(randomAngle) * spawnDistance); // 600 é meio da tela
+            enemyObj->box.y = Camera::pos.y + 450 + (std::sin(randomAngle) * spawnDistance); // 450 é meio da tela
 
-            Zombie* zombie = new Zombie(*zombieObj);
-            zombieObj->AddComponent(zombie);
+            // 30% NPC / 70% zumbi
+            if (rand() % 100 < 30) {
+                AIController* npc = new AIController(*enemyObj);
+                enemyObj->AddComponent(npc);
+            } else {
+                Zombie* zombie = new Zombie(*enemyObj);
+                enemyObj->AddComponent(zombie);
+            }
 
-            Game::GetInstance().GetState().AddObject(zombieObj);
+            Game::GetInstance().GetState().AddObject(enemyObj);
             
             zombieCounter++;
         }
-    } else if (Zombie::zombieCount == 0) {
+    } 
+    else if (Zombie::zombieCount == 0 && AIController::npcCounter == 0) {
         currentWave++;
         zombieCounter = 0;
     }
@@ -1498,6 +1657,7 @@ void WaveSpawner::Render() { }
 #include "Animation.h"
 #include "Collider.h"
 #include "Bullet.h"
+#include "Character.h"
 
 int Zombie::zombieCount = 0;
 
@@ -1506,11 +1666,12 @@ Zombie::Zombie(GameObject& associated) : Component(associated), hitpoints(100) {
     associated.AddComponent(sprite);
 
     Animator* animator = new Animator(associated);
-    animator->AddAnimation("walking", Animation(0, 3, 10.0f));
-    animator->AddAnimation("dead", Animation(5, 5, 0.0f));
-    
+    animator->AddAnimation("walking_right", Animation(0, 3, 0.15f, SDL_FLIP_NONE));
+    animator->AddAnimation("walking_left", Animation(0, 3, 0.15f, SDL_FLIP_HORIZONTAL));
+    animator->AddAnimation("dead_right", Animation(5, 5, 0.15f, SDL_FLIP_NONE));
+    animator->AddAnimation("dead_left", Animation(5, 5, 0.15f, SDL_FLIP_HORIZONTAL));
     associated.AddComponent(animator);
-    animator->SetAnimation("walking");
+    animator->SetAnimation("walking_right");
 
     associated.AddComponent(new Collider(associated));
 
@@ -1534,7 +1695,7 @@ void Zombie::Damage(int damage) {
         isDead = true;
         Animator* animator = associated.GetComponent<Animator>();
         if (animator != nullptr) {
-            animator->SetAnimation("dead");
+            animator->SetAnimation(facingLeft ? "dead_left" : "dead_right");
         }
 
         deathSound.Play(1);
@@ -1556,10 +1717,71 @@ void Zombie::NotifyCollision(GameObject& other) {
 }
 
 void Zombie::Update(float dt) {
+    if (isDead) {
+        deathTimer.Update(dt);
+        if (deathTimer.Get() >= 5.0f) {
+            associated.RequestDelete();
+        }
+        return;
+    }
+
+    if (Character::player != nullptr) {
+        Vec2 playerPos = Character::player->GetAssociated().box.Center();
+        Vec2 currentPos = associated.box.Center();
+        
+        Vec2 dir = (playerPos - currentPos).GetNormalized();
+        float speed = 80.0f * dt;
+        
+        associated.box.x += dir.x * speed;
+        associated.box.y += dir.y * speed;
+
+        if (dir.x < -0.1f) {
+            facingLeft = true;
+        } else if (dir.x > 0.1f) {
+            facingLeft = false;
+        }
+
+        Animator* animator = associated.GetComponent<Animator>();
+        if (animator != nullptr) {
+            animator->SetAnimation(facingLeft ? "walking_left" : "walking_right");
+        }
+    }
+    
 }
 
 void Zombie::Render() {
 }
+#pragma once
+#include "Component.h"
+#include "Timer.h"
+#include "Vec2.h"
+#include "Sound.h"
+
+class AIController : public Component {
+private:
+    enum AIState { MOVING, RESTING };
+    AIState state;
+    Timer restTimer;
+    Vec2 destination;
+
+    int hp;
+    bool isDead;
+    bool facingLeft = false;
+    Timer deathTimer;
+    Sound deathSound;
+
+public:
+    static int npcCounter; 
+
+    AIController(GameObject& associated);
+    ~AIController();
+
+    void Update(float dt) override;
+    void Render() override;
+    
+    void NotifyCollision(GameObject& other) override;
+    void Damage(int damage);
+};
 #pragma once
 #include <SDL3/SDL.h>
 
@@ -1609,7 +1831,8 @@ private:
     int damage;
 
 public:
-    Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance);
+    bool targetsPlayer;
+    Bullet(GameObject& associated, float angle, float speed, int damage, float maxDistance, bool targetsPlayer);
     void Update(float dt) override;
     void Render() override;
     void NotifyCollision(GameObject& other) override;
@@ -1645,6 +1868,7 @@ private:
     float linearSpeed;
     int hp;
     Timer deathTimer;
+    Timer damageCooldown;
     bool facingLeft;
 
 public:
@@ -1656,6 +1880,7 @@ public:
     void Update(float dt) override;
     void Render() override;
     void Issue(Command task);
+    void NotifyCollision(GameObject& other) override;
 };
 #pragma once
 #include "Component.h"
@@ -1790,6 +2015,7 @@ protected:
     GameObject& associated;
 
 public:
+    GameObject& GetAssociated() { return associated; }
     //recebe a referência e a iniciasliza na lista
     Component(GameObject& associated) : associated(associated) {}
     
@@ -2249,11 +2475,14 @@ public:
 #pragma once
 #include "Component.h"
 #include "Sound.h"
+#include "Timer.h"
 
 class Zombie : public Component {
 private:
     int hitpoints;
     bool isDead = false;
+    bool facingLeft = false;
+    Timer deathTimer;
     Sound deathSound;
 
 public:

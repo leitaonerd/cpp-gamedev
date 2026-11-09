@@ -25,7 +25,6 @@ void PlayerController::Update(float dt) {
     }
 
     if (input.KeyPress(SDLK_F)) {
-        std::cout << "SDLK pegou o keypress do F." << std::endl;
         Vec2 target(input.GetMouseX(), input.GetMouseY());
         target.x += Camera::pos.x;
         target.y += Camera::pos.y;

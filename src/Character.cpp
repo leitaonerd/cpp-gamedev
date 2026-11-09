@@ -22,9 +22,9 @@ Character::Character(GameObject& associated, std::string sprite)
     Animator* animator = new Animator(associated);
     animator->AddAnimation("idle_right", Animation(0, 0, 0.0f, SDL_FLIP_NONE));
     animator->AddAnimation("idle_left", Animation(0, 0, 0.0f, SDL_FLIP_HORIZONTAL));
-    animator->AddAnimation("walking_right", Animation(0, 3, 0.1f, SDL_FLIP_NONE));
-    animator->AddAnimation("walking_left", Animation(0, 3, 0.1f, SDL_FLIP_HORIZONTAL));
-    animator->AddAnimation("dead", Animation(0, 0, 0.0f, SDL_FLIP_NONE));
+    animator->AddAnimation("walking_right", Animation(0, 9, 0.1f, SDL_FLIP_NONE));
+    animator->AddAnimation("walking_left", Animation(0, 9, 0.1f, SDL_FLIP_HORIZONTAL));
+    animator->AddAnimation("dead", Animation(10, 11, 0.0f, SDL_FLIP_NONE));
     associated.AddComponent(animator);
     animator->SetAnimation("idle_right");
 

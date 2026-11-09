@@ -14,11 +14,12 @@ Zombie::Zombie(GameObject& associated) : Component(associated), hitpoints(100) {
     associated.AddComponent(sprite);
 
     Animator* animator = new Animator(associated);
-    animator->AddAnimation("walking", Animation(0, 3, 10.0f));
-    animator->AddAnimation("dead", Animation(5, 5, 0.0f));
-    
+    animator->AddAnimation("walking_right", Animation(0, 3, 0.15f, SDL_FLIP_NONE));
+    animator->AddAnimation("walking_left", Animation(0, 3, 0.15f, SDL_FLIP_HORIZONTAL));
+    animator->AddAnimation("dead_right", Animation(5, 5, 0.15f, SDL_FLIP_NONE));
+    animator->AddAnimation("dead_left", Animation(5, 5, 0.15f, SDL_FLIP_HORIZONTAL));
     associated.AddComponent(animator);
-    animator->SetAnimation("walking");
+    animator->SetAnimation("walking_right");
 
     associated.AddComponent(new Collider(associated));
 
@@ -42,7 +43,7 @@ void Zombie::Damage(int damage) {
         isDead = true;
         Animator* animator = associated.GetComponent<Animator>();
         if (animator != nullptr) {
-            animator->SetAnimation("dead");
+            animator->SetAnimation(facingLeft ? "dead_left" : "dead_right");
         }
 
         deathSound.Play(1);
@@ -81,7 +82,22 @@ void Zombie::Update(float dt) {
         
         associated.box.x += dir.x * speed;
         associated.box.y += dir.y * speed;
+
+        if (dir.x < -0.1f) {
+            facingLeft = true;
+        } else if (dir.x > 0.1f) {
+            facingLeft = false;
+        }
+
+        Animator* animator = associated.GetComponent<Animator>();
+        if (animator != nullptr) {
+            animator->SetAnimation(facingLeft ? "walking_left" : "walking_right");
+        }
+        if (animator != nullptr) {
+                animator->Update(dt);
+        }
     }
+    
 }
 
 void Zombie::Render() {
