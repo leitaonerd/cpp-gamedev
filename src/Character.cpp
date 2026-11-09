@@ -6,6 +6,8 @@
 #include "Animation.h"
 #include "Game.h"
 #include "Collider.h"
+#include "Bullet.h"
+#include "Zombie.h"
 
 Character* Character::player = nullptr;
 
@@ -51,6 +53,7 @@ void Character::Start() {
 }
 
 void Character::Update(float dt) {
+    damageCooldown.Update(dt);
     if (hp <= 0) {
         // animação de morte
         Animator* animator = associated.GetComponent<Animator>();
@@ -125,4 +128,17 @@ void Character::Render() {}
 
 void Character::Issue(Command task) {
     taskQueue.push(task);
+}
+
+void Character::NotifyCollision(GameObject& other) {
+    Bullet* bullet = other.GetComponent<Bullet>();
+    if (bullet != nullptr && bullet->targetsPlayer) {
+        hp -= bullet->GetDamage();
+    }
+
+    Zombie* zombie = other.GetComponent<Zombie>();
+    if (zombie != nullptr && damageCooldown.Get() >= 1.0f) {
+        hp -= 20;
+        damageCooldown.Restart();
+    }
 }

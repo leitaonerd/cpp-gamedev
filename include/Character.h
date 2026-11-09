@@ -14,6 +14,7 @@ private:
     float linearSpeed;
     int hp;
     Timer deathTimer;
+    Timer damageCooldown;
     bool facingLeft;
 
 public:
@@ -25,4 +26,5 @@ public:
     void Update(float dt) override;
     void Render() override;
     void Issue(Command task);
+    void NotifyCollision(GameObject& other) override;
 };
