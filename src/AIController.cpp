@@ -11,7 +11,7 @@ int AIController::npcCounter = 0;
 AIController::AIController(GameObject& associated) 
     : Component(associated), state(RESTING), hp(100), isDead(false) {
 
-    SpriteRenderer* sprite = new SpriteRenderer(associated, "assets/img/Enemy.png", 3, 2);
+    SpriteRenderer* sprite = new SpriteRenderer(associated, "assets/img/NPC.png", 3, 2);
     associated.AddComponent(sprite);
 
     Animator* animator = new Animator(associated);
